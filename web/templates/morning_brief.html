@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hanna — Morning Brief</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      /* — surfaces — */
+      --bg:          #ECEFE9;
+      --bg-elev:     #DFE5DD;
+      --bg-inset:    #D2DACE;
+
+      /* — extended palette: 7 functional colors, all muted/earth-cool — */
+      --sage:        #6B7E73;   /* primary action */
+      --blue:        #6E8893;   /* temporal · forcing function */
+      --honey:       #9A8854;   /* info · attention */
+      --clay:        #A0735D;   /* escalation (muted, never red) */
+      --lichen:      #7A8556;   /* complete · observed */
+      --lavender:    #7E7D8E;   /* linked · referenced */
+      --stone:       #8B968F;   /* muted · parked */
+
+      /* — matching tint backgrounds (Notion-style color_background pairs) — */
+      --tint-sage:     #D5DECF;
+      --tint-blue:     #CFD9DB;
+      --tint-honey:    #E2D9BE;
+      --tint-clay:     #E2CDBE;
+      --tint-lichen:   #D7DBC0;
+      --tint-lavender: #D5D4DA;
+      --tint-stone:    #D5DAD3;
+      --tint-sage-deep: #C5D2BD;
+
+      /* — ink — */
+      --ink:         #2D3B3D;
+      --ink-soft:    #56625F;
+      --muted:       #8B968F;
+      --rule:        rgba(45, 59, 61, 0.10);
+      --rule-soft:   rgba(45, 59, 61, 0.05);
+
+      --mono:   "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+      --sans:   "Manrope", -apple-system, system-ui, sans-serif;
+
+      --measure: 920px;
+      --gutter:  120px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: 16px;
+      line-height: 1.7;
+      font-feature-settings: "kern" 1, "liga" 1, "calt" 1, "ss01" 1;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    .display, .display *,
+    .dateline,
+    .portfolio-num,
+    .forcing-row .days,
+    .family .countdown,
+    .colophon,
+    .version,
+    .time-chip,
+    .pill,
+    .property .val {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .page {
+      max-width: var(--measure);
+      margin: 0 auto;
+      padding: 96px 32px 200px;
+    }
+
+    /* ─────────────────────────────────────────────────────── masthead */
+
+    .masthead {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 80px;
+    }
+
+    .wordmark { font-family: var(--mono); line-height: 0.9; }
+
+    .wordmark .primary {
+      display: block;
+      font-size: 42px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+    }
+
+    .wordmark .secondary {
+      display: block;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--sage);
+      margin-top: 14px;
+      padding-left: 2px;
+    }
+
+    .version {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      text-align: right;
+      line-height: 1.7;
+    }
+
+    .version .v { display: block; color: var(--ink-soft); }
+
+    /* ─────────────────────────────────────────────────────── titling — date is the page */
+
+    .titling {
+      margin-top: 40px;
+      margin-bottom: 96px;
+    }
+
+    .titling .label {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .display {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: clamp(96px, 19vw, 232px);
+      line-height: 0.9;
+      letter-spacing: -0.055em;
+      margin: 0;
+      color: var(--ink);
+      margin-left: -0.04em;
+    }
+
+    .display .date-stamp {
+      display: inline-block;
+      background: var(--tint-sage);
+      padding: 0.04em 0.10em 0.08em;
+      margin-left: -0.04em;
+    }
+
+    .display-meta {
+      margin-top: 36px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ink-soft);
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+    }
+
+    .display-meta > span {
+      padding-right: 26px;
+      margin-right: 26px;
+      border-right: 1px solid var(--rule);
+    }
+    .display-meta > span:last-child { border-right: none; }
+    .display-meta .accent { color: var(--sage); }
+
+    /* ─────────────────────────────────────────────────────── properties row — Notion-style */
+
+    .properties {
+      margin-top: 56px;
+      padding: 28px 0;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      column-gap: 40px;
+      row-gap: 20px;
+    }
+
+    .property { display: flex; flex-direction: column; gap: 8px; }
+
+    .property .key {
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .property .val {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* ─────────────────────────────────────────────────────── universal PILL component */
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 5px 10px 4px;
+      background: var(--tint-stone);
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    .pill.sage     { background: var(--tint-sage);     color: var(--sage); }
+    .pill.blue     { background: var(--tint-blue);     color: var(--blue); }
+    .pill.honey    { background: var(--tint-honey);    color: var(--honey); }
+    .pill.clay     { background: var(--tint-clay);     color: var(--clay); }
+    .pill.lichen   { background: var(--tint-lichen);   color: var(--lichen); }
+    .pill.lavender { background: var(--tint-lavender); color: var(--lavender); }
+    .pill.stone    { background: var(--tint-stone);    color: var(--ink-soft); }
+
+    .pill .icon {
+      font-size: 11px;
+      opacity: 0.9;
+    }
+
+    .pill.small {
+      font-size: 10px;
+      padding: 3px 8px 2px;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+    }
+
+    /* ─────────────────────────────────────────────────────── MENTION component — @-style reference */
+
+    .mention {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 3px 9px 2px;
+      background: var(--tint-sage);
+      color: var(--sage);
+      transition: background 0.15s ease;
+    }
+
+    .mention:hover { background: var(--tint-sage-deep); }
+
+    .mention .at {
+      font-size: 11px;
+      opacity: 0.75;
+      font-weight: 500;
+    }
+
+    .mention.session {
+      background: var(--tint-lavender);
+      color: var(--lavender);
+    }
+
+    .mention.session.active {
+      background: var(--tint-honey);
+      color: var(--honey);
+    }
+
+    /* ─────────────────────────────────────────────────────── CALLOUT — Notion's signature block */
+
+    .callout {
+      margin-top: 80px;
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      gap: 0;
+      background: var(--tint-honey);
+      padding: 28px 32px 30px;
+      align-items: start;
+    }
+
+    .callout.sage   { background: var(--tint-sage); }
+    .callout.blue   { background: var(--tint-blue); }
+    .callout.lichen { background: var(--tint-lichen); }
+    .callout.clay   { background: var(--tint-clay); }
+
+    .callout .callout-icon {
+      font-family: var(--mono);
+      font-size: 22px;
+      line-height: 1;
+      color: var(--honey);
+      padding-top: 4px;
+    }
+    .callout.sage   .callout-icon { color: var(--sage); }
+    .callout.blue   .callout-icon { color: var(--blue); }
+    .callout.lichen .callout-icon { color: var(--lichen); }
+    .callout.clay   .callout-icon { color: var(--clay); }
+
+    .callout .callout-body { padding-right: 12px; }
+
+    .callout .callout-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--honey);
+      margin-bottom: 12px;
+    }
+    .callout.sage   .callout-label { color: var(--sage); }
+    .callout.blue   .callout-label { color: var(--blue); }
+    .callout.lichen .callout-label { color: var(--lichen); }
+    .callout.clay   .callout-label { color: var(--clay); }
+
+    .callout p {
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: 16px;
+      line-height: 1.65;
+      letter-spacing: -0.003em;
+      color: var(--ink);
+      margin: 0;
+    }
+
+    /* ─────────────────────────────────────────────────────── status strip */
+
+    .status-strip {
+      margin-top: 56px;
+      padding: 32px 0;
+      border-top:    1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 48px;
+    }
+
+    .status-cell .key {
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .status-cell .val {
+      font-family: var(--mono);
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-cell .val .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--sage); flex-shrink: 0;
+    }
+
+    .status-cell .val.muted-state { color: var(--ink-soft); }
+
+    /* ─────────────────────────────────────────────────────── producer note (side voice, italic) */
+
+    .producer-note {
+      margin-top: 96px;
+      display: grid;
+      grid-template-columns: var(--gutter) 1fr;
+      gap: 32px;
+      align-items: baseline;
+    }
+
+    .producer-note .from {
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--sage);
+      padding-top: 6px;
+    }
+
+    .producer-note p {
+      font-family: var(--sans);
+      font-weight: 400;
+      font-style: italic;
+      font-size: 17px;
+      line-height: 1.65;
+      letter-spacing: -0.005em;
+      color: var(--ink-soft);
+      margin: 0;
+      max-width: 620px;
+    }
+
+    /* ─────────────────────────────────────────────────────── sections */
+
+    .section { margin-top: 144px; }
+    .producer-note + .section { margin-top: 96px; }
+    .callout + .section { margin-top: 96px; }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: var(--gutter) 1fr;
+      gap: 32px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 56px;
+      align-items: baseline;
+    }
+
+    .section-head .num {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.24em;
+      color: var(--muted);
+    }
+
+    .section-head .title-block .title {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: 32px;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      color: var(--ink);
+      margin: 0;
+    }
+
+    .section-head .title-block .sub {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    .section.primary .section-head .title-block .title {
+      font-size: 48px; line-height: 1.1; letter-spacing: -0.035em;
+    }
+
+    .section.minor { margin-top: 96px; }
+    .section.minor .section-head {
+      padding-bottom: 16px; margin-bottom: 24px;
+    }
+    .section.minor .section-head .title-block .title {
+      font-size: 18px; line-height: 1.3;
+      color: var(--ink-soft); letter-spacing: -0.01em;
+    }
+
+    /* ─────────────────────────────────────────────────────── portfolio — uses MENTION + STATUS PILLS */
+
+    .portfolio-item {
+      display: grid;
+      grid-template-columns: var(--gutter) 1fr auto;
+      gap: 32px;
+      padding: 44px 0;
+      border-bottom: 1px solid var(--rule);
+      align-items: baseline;
+    }
+    .portfolio-item:last-child { border-bottom: none; }
+
+    .portfolio-num {
+      font-family: var(--mono);
+      font-weight: 500;
+      font-size: 64px;
+      letter-spacing: -0.04em;
+      line-height: 0.85;
+      color: var(--ink);
+    }
+
+    .portfolio-item .body .name { margin-bottom: 18px; }
+
+    .portfolio-item .body .blocker {
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: 16px;
+      line-height: 1.7;
+      color: var(--ink-soft);
+      letter-spacing: -0.003em;
+      max-width: 560px;
+    }
+
+    .portfolio-item .body .blocker code {
+      font-family: var(--mono);
+      font-size: 13.5px;
+      font-weight: 500;
+      background: var(--bg-elev);
+      padding: 2px 8px;
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    /* ─────────────────────────────────────────────────────── forcing functions */
+
+    .forcing-row {
+      display: grid;
+      grid-template-columns: var(--gutter) auto 1fr;
+      gap: 32px;
+      padding: 52px 0;
+      border-bottom: 1px solid var(--rule);
+      align-items: baseline;
+    }
+    .forcing-row:last-child { border-bottom: none; }
+
+    .forcing-row .unit {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .forcing-row .days {
+      font-family: var(--mono);
+      font-weight: 500;
+      font-size: clamp(80px, 11vw, 144px);
+      line-height: 0.85;
+      letter-spacing: -0.05em;
+      color: var(--ink);
+    }
+
+    .forcing-row .days.imminent .number {
+      display: inline-block;
+      background: var(--tint-blue);
+      color: var(--blue);
+      padding: 0.02em 0.08em 0.06em;
+    }
+
+    .forcing-row .days.infinite {
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .forcing-row .desc {
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--ink-soft);
+      letter-spacing: -0.003em;
+      max-width: 460px;
+      align-self: end;
+      padding-bottom: 14px;
+    }
+
+    .forcing-row .desc .pill {
+      margin-top: 12px;
+    }
+
+    /* ─────────────────────────────────────────────────────── focus block — pills for meta */
+
+    .focus-grid {
+      display: grid;
+      grid-template-columns: var(--gutter) 1fr;
+      gap: 32px;
+    }
+
+    .focus {
+      background: var(--bg-inset);
+      padding: 56px 60px;
+    }
+
+    .focus .focus-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 32px;
+    }
+
+    .focus h3 {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: 28px;
+      line-height: 1.25;
+      letter-spacing: -0.025em;
+      color: var(--ink);
+      margin: 0 0 30px;
+    }
+
+    .focus h3 .file { color: var(--sage); font-weight: 600; }
+
+    .focus .meta-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 38px;
+    }
+
+    .focus .stop {
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--ink-soft);
+      letter-spacing: -0.002em;
+    }
+
+    .focus .stop .key {
+      display: block;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 14px;
+    }
+
+    /* ─────────────────────────────────────────────────────── active formations — minor */
+
+    .inert-block {
+      display: grid;
+      grid-template-columns: var(--gutter) 1fr;
+      gap: 32px;
+    }
+
+    .inert {
+      font-family: var(--mono);
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .inert .marker {
+      color: var(--blue); opacity: 0.7; font-size: 16px;
+    }
+
+    /* ─────────────────────────────────────────────────────── BACKLINKS — Notion's relations block */
+
+    .backlinks {
+      margin-top: 144px;
+      display: grid;
+      grid-template-columns: var(--gutter) 1fr;
+      gap: 32px;
+      align-items: baseline;
+    }
+
+    .backlinks-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding-top: 8px;
+    }
+
+    .backlinks-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    /* ─────────────────────────────────────────────────────── family window */
+
+    .family {
+      margin-top: 200px;
+      padding: 80px 0 64px;
+      border-top: 1px solid var(--ink);
+    }
+
+    .family .label {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--sage);
+      margin-bottom: 32px;
+    }
+
+    .family .line {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: clamp(56px, 9vw, 104px);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+      margin: 0;
+    }
+
+    .family .line .time-chip {
+      display: inline-block;
+      background: var(--tint-sage-deep);
+      color: var(--sage);
+      padding: 0.04em 0.14em 0.08em;
+      margin-left: 0.02em;
+    }
+
+    .family .countdown-row {
+      margin-top: 56px;
+      display: grid;
+      grid-template-columns: var(--gutter) 1fr auto;
+      gap: 32px;
+      align-items: baseline;
+    }
+
+    .family .countdown-row .key {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .family .countdown {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: 36px;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+
+    .family .countdown-row .note {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+      text-align: right;
+    }
+
+    /* ─────────────────────────────────────────────────────── modulating line */
+
+    .modline {
+      margin-top: 40px;
+      height: 16px;
+      width: 100%;
+      opacity: 0.55;
+    }
+
+    /* ─────────────────────────────────────────────────────── colophon */
+
+    .colophon {
+      margin-top: 80px;
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      opacity: 0.7;
+    }
+
+    /* ─────────────────────────────────────────────────────── motion */
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .masthead, .titling, .properties, .callout, .status-strip,
+    .producer-note, .section, .backlinks, .family, .colophon {
+      animation: rise 0.95s cubic-bezier(0.16, 0.84, 0.24, 1) both;
+    }
+
+    .titling        { animation-delay: 0.08s; }
+    .properties     { animation-delay: 0.18s; }
+    .callout        { animation-delay: 0.28s; }
+    .status-strip   { animation-delay: 0.38s; }
+    .producer-note  { animation-delay: 0.48s; }
+    .section:nth-of-type(1) { animation-delay: 0.58s; }
+    .section:nth-of-type(2) { animation-delay: 0.68s; }
+    .section:nth-of-type(3) { animation-delay: 0.78s; }
+    .section:nth-of-type(4) { animation-delay: 0.88s; }
+    .backlinks      { animation-delay: 0.98s; }
+    .family         { animation-delay: 1.08s; }
+    .colophon       { animation-delay: 1.18s; }
+
+    /* ─────────────────────────────────────────────────────── responsive */
+
+    @media (max-width: 720px) {
+      :root { --gutter: 52px; }
+      .page { padding: 64px 22px 120px; }
+      .titling { margin-bottom: 64px; }
+      .display { font-size: clamp(64px, 18vw, 120px); }
+      .properties { grid-template-columns: 1fr 1fr; column-gap: 20px; row-gap: 16px; }
+      .callout { grid-template-columns: 40px 1fr; padding: 22px 22px 24px; }
+      .callout .callout-icon { font-size: 18px; }
+      .status-strip { grid-template-columns: 1fr; gap: 24px; padding: 24px 0; }
+      .producer-note { grid-template-columns: 1fr; gap: 16px; }
+      .producer-note .from { padding-top: 0; }
+      .section-head { grid-template-columns: 1fr; gap: 12px; }
+      .section.primary .section-head .title-block .title { font-size: 32px; }
+      .portfolio-item { grid-template-columns: 52px 1fr; padding: 28px 0; }
+      .portfolio-num { font-size: 44px; }
+      .portfolio-item .status { grid-column: 2; margin-top: 12px; }
+      .forcing-row { grid-template-columns: 1fr; padding: 32px 0; gap: 16px; }
+      .forcing-row .days { font-size: clamp(64px, 18vw, 96px); }
+      .forcing-row .desc { padding-bottom: 0; }
+      .focus-grid { grid-template-columns: 1fr; gap: 16px; }
+      .focus { padding: 36px 28px; }
+      .inert-block { grid-template-columns: 1fr; gap: 12px; }
+      .backlinks { grid-template-columns: 1fr; gap: 12px; margin-top: 96px; }
+      .backlinks-label { padding-top: 0; }
+      .family { margin-top: 140px; padding: 56px 0 40px; }
+      .family .countdown-row { grid-template-columns: 1fr; gap: 12px; }
+      .family .countdown-row .note { text-align: left; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+
+    <!-- MASTHEAD -->
+    <header class="masthead">
+      <div class="wordmark">
+        <span class="primary">Hanna</span>
+        <span class="secondary">The Producer</span>
+      </div>
+      <div class="version">
+        <span class="v">v0.1.0 — DRAFT</span>
+        <span>Session 02</span>
+      </div>
+    </header>
+
+    <!-- TITLING — the date -->
+    <section class="titling">
+      <div class="label">Morning Brief — № 001</div>
+      <h1 class="display"><span class="date-stamp">14&nbsp;MAY&nbsp;26</span></h1>
+
+      <svg class="modline" viewBox="0 0 920 16" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0,8 L200,8 Q220,8 224,4 L280,4 Q284,4 284,8 L480,8 Q500,8 504,12 L580,12 Q584,12 584,8 L920,8"
+              fill="none" stroke="#6E8893" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+
+      <div class="display-meta">
+        <span>Thursday</span>
+        <span>9:00 AM EST</span>
+        <span class="accent">8h Working Window</span>
+        <span>No Override</span>
+      </div>
+    </section>
+
+    <!-- PROPERTIES — Notion-style page properties -->
+    <section class="properties">
+      <div class="property">
+        <div class="key">Owner</div>
+        <div class="val">Joe Ibrahim</div>
+      </div>
+      <div class="property">
+        <div class="key">Phase</div>
+        <div class="val">
+          <span class="pill sage small"><span class="icon">◐</span>Morning</span>
+        </div>
+      </div>
+      <div class="property">
+        <div class="key">Energy</div>
+        <div class="val">
+          <span class="pill lichen small"><span class="icon">●</span>Green · Building</span>
+        </div>
+      </div>
+      <div class="property">
+        <div class="key">Override</div>
+        <div class="val">
+          <span class="pill stone small">None required</span>
+        </div>
+      </div>
+      <div class="property">
+        <div class="key">Source</div>
+        <div class="val">
+          <span class="mention"><span class="at">@</span>Harlo</span>
+        </div>
+      </div>
+      <div class="property">
+        <div class="key">Brief №</div>
+        <div class="val">001 / 2026</div>
+      </div>
+    </section>
+
+    <!-- STATUS STRIP -->
+    <section class="status-strip">
+      <div class="status-cell">
+        <div class="key">Producer Phase</div>
+        <div class="val"><span class="dot"></span>Morning</div>
+      </div>
+      <div class="status-cell">
+        <div class="key">Joe · via Harlo</div>
+        <div class="val"><span class="dot"></span>Green · Building</div>
+      </div>
+      <div class="status-cell">
+        <div class="key">Predicted Curve</div>
+        <div class="val muted-state"><span class="dot"></span>Rolling 10:30 AM</div>
+      </div>
+    </section>
+
+    <!-- PRODUCER NOTE -->
+    <section class="producer-note">
+      <div class="from">From the producer</div>
+      <p>
+        Quick window today. Session 02 scaffolding is the priority — clean
+        cognitive read, momentum building, predicted curve favorable.
+      </p>
+    </section>
+
+    <!-- PORTFOLIO -->
+    <section class="section">
+      <div class="section-head">
+        <div class="num">§01</div>
+        <div class="title-block">
+          <h2 class="title">The Portfolio</h2>
+          <div class="sub">Top blocker · per product</div>
+        </div>
+      </div>
+
+      <div class="portfolio-item">
+        <div class="portfolio-num">01</div>
+        <div class="body">
+          <div class="name">
+            <span class="mention"><span class="at">@</span>Harlo</span>
+          </div>
+          <div class="blocker">
+            Session 02 scaffold pending. Clone <code>compute_burst.py</code>
+            into <code>compute_producer_phase.py</code> with enum and
+            signatures.
+          </div>
+        </div>
+        <div class="pill clay"><span class="icon">⌁</span>Action · Today</div>
+      </div>
+
+      <div class="portfolio-item">
+        <div class="portfolio-num">02</div>
+        <div class="body">
+          <div class="name">
+            <span class="mention"><span class="at">@</span>Octavius</span>
+          </div>
+          <div class="blocker">
+            Formation idle. Harvest pending — four days since last output.
+            No spawn requested.
+          </div>
+        </div>
+        <div class="pill stone"><span class="icon">◐</span>Idle · Review</div>
+      </div>
+
+      <div class="portfolio-item">
+        <div class="portfolio-num">03</div>
+        <div class="body">
+          <div class="name">
+            <span class="mention"><span class="at">@</span>Moneta</span>
+          </div>
+          <div class="blocker">
+            Parked. No movement expected until producer-build phase clears.
+          </div>
+        </div>
+        <div class="pill stone"><span class="icon">◯</span>Parked</div>
+      </div>
+
+      <div class="portfolio-item">
+        <div class="portfolio-num">04</div>
+        <div class="body">
+          <div class="name">
+            <span class="mention"><span class="at">@</span>Comfy-Cozy</span>
+          </div>
+          <div class="blocker">
+            Harvest mode. Organic GitHub traction continues; signal capture
+            only. No roadmap pull.
+          </div>
+        </div>
+        <div class="pill lichen"><span class="icon">●</span>Observe</div>
+      </div>
+    </section>
+
+    <!-- FORCING FUNCTIONS -->
+    <section class="section">
+      <div class="section-head">
+        <div class="num">§02</div>
+        <div class="title-block">
+          <h2 class="title">Forcing Functions</h2>
+          <div class="sub">Days into the critical window</div>
+        </div>
+      </div>
+
+      <div class="forcing-row">
+        <div class="unit">Days</div>
+        <div class="days">22</div>
+        <div class="desc">
+          Quarterly portfolio review. Cadence checkpoint across
+          <span class="mention"><span class="at">@</span>Harlo</span>,
+          <span class="mention"><span class="at">@</span>Octavius</span>,
+          <span class="mention"><span class="at">@</span>Moneta</span>,
+          <span class="mention"><span class="at">@</span>Comfy-Cozy</span>.
+        </div>
+      </div>
+
+      <div class="forcing-row">
+        <div class="unit">Undefined</div>
+        <div class="days infinite">∞</div>
+        <div class="desc">
+          Comfy-Cozy 1k-star milestone. Organic curve, no forced date.
+          <div><span class="pill lichen small"><span class="icon">●</span>Observing</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RECOMMENDED FOCUS — primary -->
+    <section class="section primary">
+      <div class="section-head">
+        <div class="num">§03</div>
+        <div class="title-block">
+          <h2 class="title">Recommended Focus</h2>
+          <div class="sub">For the morning window</div>
+        </div>
+      </div>
+
+      <div class="focus-grid">
+        <div></div>
+        <div class="focus">
+          <div class="focus-label">Today · Single Deliverable</div>
+          <h3>
+            Session 02 scaffold —
+            <span class="file">compute_producer_phase.py</span>
+          </h3>
+          <div class="meta-pills">
+            <span class="pill stone"><span class="icon">⏱</span>~90 min</span>
+            <span class="pill honey"><span class="icon">◐</span>Cost · Medium</span>
+            <span class="pill lavender"><span class="icon">⎘</span>Clone · compute_burst.py</span>
+            <span class="pill sage"><span class="icon">◇</span>Single deliverable</span>
+          </div>
+          <div class="stop">
+            <span class="key">Stop conditions</span>
+            Blueprint contradiction, dual-venv ambiguity beyond the documented
+            IPC pattern, or any family signal. Surface rather than work around.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACTIVE FORMATIONS — minor -->
+    <section class="section minor">
+      <div class="section-head">
+        <div class="num">§04</div>
+        <div class="title-block">
+          <h2 class="title">Active Formations</h2>
+        </div>
+      </div>
+      <div class="inert-block">
+        <div></div>
+        <div class="inert">
+          <span class="marker">∅</span>
+          None active. Last harvest four days ago via
+          <span class="mention"><span class="at">@</span>Octavius</span>.
+        </div>
+      </div>
+    </section>
+
+    <!-- BACKLINKS — Notion's relations block -->
+    <aside class="backlinks">
+      <div class="backlinks-label">Mentioned in</div>
+      <div class="backlinks-list">
+        <span class="mention session"><span class="at">§</span>01 — recon</span>
+        <span class="mention session"><span class="at">§</span>01.5 — rules</span>
+        <span class="mention session active"><span class="at">§</span>02 — scaffold · in progress</span>
+        <span class="mention"><span class="at">@</span>Harlo</span>
+        <span class="mention"><span class="at">@</span>Octavius</span>
+      </div>
+    </aside>
+
+    <!-- FAMILY WINDOW — the climax -->
+    <section class="family">
+      <div class="label">Family Window</div>
+      <h2 class="line">
+        Lockout begins<br>
+        <span class="time-chip">5:00 PM EST</span>
+      </h2>
+
+      <div class="countdown-row">
+        <div class="key">Time from brief</div>
+        <div class="countdown">8h 00m</div>
+        <div class="note">The director directs</div>
+      </div>
+    </section>
+
+    <!-- COLOPHON -->
+    <footer class="colophon">
+      <span>HANNA / v0.1.0</span>
+      <span>2026-05-14 · 09:00 EST</span>
+    </footer>
+
+  </main>
+</body>
+</html>
