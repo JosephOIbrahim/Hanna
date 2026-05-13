@@ -1,0 +1,40 @@
+# macOS noise
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+*.egg-info/
+.pytest_cache/
+.coverage
+.mypy_cache/
+.ruff_cache/
+
+# Dual-venv topology (blueprint §3): 3.12 USD venv + 3.14 project venv
+.venv/
+venv/
+.venv-*/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# USD stage data — session-specific, not source
+data/stages/*.usda
+data/stages/delegates/*.usda
+data/stages/*.usda.archive/
+
+# Local-only operational state
+twin.db
+twin.db-*
+*.log
+NEXT.local.md

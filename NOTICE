@@ -1,0 +1,22 @@
+Hanna
+Copyright 2026 Joseph Ibrahim
+
+Licensed under the Apache License, Version 2.0 (the "License").
+You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0.
+
+---
+
+This product includes software cloned from Harlo
+(https://github.com/JosephOIbrahim/Harlo). Hanna's substrate is cloned from
+Harlo and specialized for producer-rhythm. See HANNA_BLUEPRINT.md for the
+architectural relationship between the two substrates and RULES.md for the
+inherited inviolable rules (33 numbered + 8 inquiry safeguards + 4 producer-
+specific addenda).
+
+Each cloned file retains its original Apache 2.0 header and adds an
+attribution line:
+
+    # Cloned from Harlo (github.com/JosephOIbrahim/Harlo). Specialized for Hanna.
+
+The two repositories share no git history after the initial clone — Hanna
+diverges immediately into producer-specific specializations.
