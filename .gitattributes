@@ -1,0 +1,8 @@
+# Linguist overrides — keep the GitHub language widget honest.
+#
+# Phase-1 HTML mockups are design reference, not application code.
+# Exclude until real templates ship behind the MCP surface.
+web/templates/*.html      linguist-documentation
+
+# Shell launcher is utility glue, not the project's substrate.
+bin/*.command             linguist-detectable=false
