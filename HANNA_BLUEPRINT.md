@@ -269,14 +269,24 @@ Cold start: open decision in §12. Default is bootstrap from Harlo predictor for
 
 ### To Harlo (`src/harlo_bridge.py`)
 
-> **Audit 2026-05-20 — contract mismatch flagged.** The method names below were specified before Harlo's actually-exposed MCP tools were checked. Harlo's real surface is `coach`, `status`, `recall`, `store`, `patterns` (plus three more). `read_state` / `read_prediction` / `read_burnout_level` do not exist on the Harlo side. **Precondition for any bridge code:** a ~30-minute spike calls Harlo's real tools over MCP-stdio and reports back what each returns. The bridge is then either (a) renamed to call the real tools directly, (b) implemented as a small composition over real tools (e.g. `read_state := coach + status + recall(...)`), or (c) blocked pending a blueprint change. See open decision §12.5.
+> **Audit 2026-05-20 — contract reconciled.** The spike ran on 2026-05-20; full findings at [`docs/SPIKE_HARLO_EDGE_2026-05-20.md`](docs/SPIKE_HARLO_EDGE_2026-05-20.md). v0.1.0 method names are kept (they describe Hanna's intent correctly); the implementations call Harlo's real surface. **One ratification blocker remains:** Rule 35's reading of the `coach` tool's trace-authoring side effect (see §7 of the spike doc, and open decision §12.5).
 
-The v0.1.0 contract below is preserved as the *intent* — what Hanna wants to read — pending reconciliation with what Harlo actually exposes:
+The reconciled contract:
 
-- `harlo.read_state()` → current cognitive state snapshot. Cached with TTL (default 5 min, open decision §12.1).
-- `harlo.read_prediction()` → XGBoost 3-step forecast.
-- `harlo.read_burnout_level()` → cheap, called often before any brief composition.
-- **Hard rule:** if Harlo is unreachable, Hanna degrades to state-blind mode. Serves cached briefs. Refuses formation requests. Never fabricates state.
+| Hanna bridge method | Calls Harlo tool | Cost | Returns |
+|---|---|---|---|
+| `read_state()` | `status` | Cheap — no exchange driven | `v9` block (momentum, burnout, energy, altitude, schedule, allostatic load, dynamics, current prediction slot) |
+| `read_burnout_level()` | `status` (projection) | Cheap | `v9.state.burnout` ∈ {`GREEN`, `YELLOW`, `ORANGE`, `RED`} |
+| `read_schedule()` *(added by spike)* | `status` (projection) | Cheap | `v9.schedule` = `{kind, override_reason}` |
+| `read_prediction()` | `status` (projection — *passive*) | Cheap | `v9.prediction`, or `None` when Harlo's predictor is inactive |
+| `drive_coaching_exchange()` *(added by spike, blocked on Rule 35 ratification)* | `coach` | Heavy — authors traces, routes through delegates, may refresh prediction, saves the exchange | `{coach_block, cognitive_context, v9}` |
+| `recall()` / `query_past_experience()` / `patterns()` | identical names | Each advances `exchange_index` only | per Harlo's tool schemas |
+
+**Hard rule (unchanged):** if Harlo is unreachable, Hanna degrades to state-blind mode. Serves cached briefs. Refuses formation requests. Never fabricates state.
+
+**New hard rule from the spike:** Hanna's bridge calls `read_prediction()` defensively — `None` is a valid return when Harlo's predictor flag is `false`. Composition must not require a non-null prediction.
+
+**Forbidden tools (Rule 35):** `store`, `stage_reload`, `resolve_verifications`, `trigger_cognitive_recalibration`. The bridge must never expose methods that call these.
 
 ### To Octavius (`src/octavius_bridge.py`)
 
@@ -351,14 +361,14 @@ This shape is reached when the lanes have absorbed §11.1's inline pieces *and* 
 
 ### Original (v0.1.0)
 
-1. **Harlo state staleness TTL** — 5 min default cache, or event-driven via Harlo MCP push notification? *Default: TTL of 5 minutes, polled.* **Audit note:** this question presumes the Harlo contract is real, which §12.5 has not confirmed yet — TTL falls out of contract resolution.
+1. **Harlo state staleness TTL** — 5 min default cache, or event-driven via Harlo MCP push notification? *Default: TTL of 5 minutes, polled.* **Spike-resolved 2026-05-20:** `status` is cheap enough that polling at brief-composition cadence (~6× per workday) is trivial. 5-minute TTL stands. Push notification not needed.
 2. **Capsule write-through** — does Hanna mirror evening capsules into Harlo's stage as well, or stay private? *Default: capsules stay private to Hanna. No write-through.* Defers indefinitely until capsule shape exists.
 3. **Formation authorization** — does `hanna_request_formation` need OOB consent (HMAC + TTL), or is trusted-localhost trust boundary enough? *Default: trusted-localhost. HMAC added when Hanna runs over network.* Defers until Hanna ships over network.
-4. **Predictor cold-start** — retrain from scratch on synthetic producer signals, or bootstrap from Harlo's predictor for the first weeks and substitute later? *Default: bootstrap from Harlo's predictor.* **Audit note:** moot if §4 XGBoost status resolves Cut.
+4. **Predictor cold-start** — retrain from scratch on synthetic producer signals, or bootstrap from Harlo's predictor for the first weeks and substitute later? *Default: bootstrap from Harlo's predictor.* **Spike-resolved 2026-05-20:** Harlo's predictor is currently inactive (`v9.engine.predictor: false`, `v9.prediction: null`). There is nothing to bootstrap from. Combined with §4's Cut-pending-ratification status on XGBoost, the practical path is: hand-coded heuristic for forcing-function ranking until Harlo's predictor flips active. Hanna's `read_prediction()` returns `None` cleanly in the meantime.
 
 ### Added by 2026-05-20 audit
 
-5. **Harlo bridge contract reconciliation (blocking).** v0.1.0 names `read_state`, `read_prediction`, `read_burnout_level`. Harlo's actually-exposed tools are `coach`, `status`, `recall`, `store`, `patterns`, plus three more. Resolution: a ~30-min spike (per §10 `harlo_edge_spike`) determines whether the v0.1.0 names are achievable as compositions over real tools, or whether the bridge contract must change. *No default — must resolve before any bridge code lands.*
+5. **Harlo bridge contract reconciliation — RESOLVED 2026-05-20, pending one ratification.** Spike ran on 2026-05-20; full findings at [`docs/SPIKE_HARLO_EDGE_2026-05-20.md`](docs/SPIKE_HARLO_EDGE_2026-05-20.md). v0.1.0 method names kept (they correctly describe Hanna's intent); implementations call `status` (cheap reads) and `coach` (heavy drive). New methods `read_schedule` and `drive_coaching_exchange` fall out of the v9 envelope. **Single remaining blocker: Rule 35 reading of `coach`'s trace-authoring side effect.** Two readings (strict / permissive) are sketched in §7 of the spike doc; the permissive reading needs a ratified entry in `docs/DECISIONS.md` before `drive_coaching_exchange` is callable from Hanna. The cheap read path (`status`) is unblocked.
 6. **Delivery channel for v1 briefs (blocking-ish).** The "always-on producer" claim contradicts an MCP-tools-only surface (Joe has to open a Claude session to hear from the producer). Candidates: browser (current Phase-1 mockup target), iMessage via Shortcuts, `osascript display notification` (macOS native), menubar app, Calendar event auto-creation, Houdini shelf tool. *Default: one-day channel test — hand-author three days of fake briefs, ship via the cheapest channel(s), observe which Joe actually acts on vs. swipes. Decision lands after that test.* **Sender naming note:** if iMessage wins, the contact name needs to be unambiguously not-a-person (e.g. `Hanna · Producer`) to avoid family confusion.
 7. **Input surface — minimum viable set (blocking).** Briefs can't compose without inputs. Three candidate input layers (§5.6): Calendar reads, per-product `.md` files, conversational `hanna_log` / `hanna_block` MCP tools. *Default: per-product `.md` files first (lowest implementation cost, zero external API surface), Calendar reads second, conversational tools third.* Decision lands when the §11.1 PoC needs real input to compose its first brief.
 8. **§4 inheritance ratification.** §4 now carries Cut / Review status on most inherited components (Hydra delegate, USD stage, three-tier storage, Rust hot path, XGBoost, dual venv, Rules 1–33 verbatim). Joe ratifies each Cut / Review item before the corresponding component is removed or selectively re-adopted. *Default per item is the status currently in §4; explicit ratification required to commit.*
