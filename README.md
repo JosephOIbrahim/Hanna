@@ -1,6 +1,8 @@
-# Hanna
+<h1 align="center">
+  <img src="assets/hanna-logo.jpg" alt="Hanna" width="600" />
+</h1>
 
-> Always-on AI producer for a creative portfolio. **Surfaces decisions; does not make them.**
+<p align="center"><em>Always-on AI producer for a creative portfolio. <strong>Surfaces decisions; does not make them.</strong></em></p>
 
 Hanna is a producer-rhythm twin: it tracks what's in-flight, what's blocking, and what's approaching across an active portfolio of products. It runs on daily and weekly cadences (morning brief, midday check, evening capsule, Monday 30k, Friday harvest, monthly 50k), and coordinates multi-agent execution on-demand. **Family time is a structural constraint, not a setting.**
 
