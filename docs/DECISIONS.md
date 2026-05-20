@@ -154,6 +154,60 @@ The router-integrator pattern keeps human-meaningful control in the main thread:
 
 ---
 
+### D003 — Apache header convention: clones inherit absence
+
+**Status:** resolved
+**Date:** 2026-05-20
+**Ratified by:** Joe (Joseph Ibrahim)
+**Scope:** [`NOTICE`](../NOTICE) (root); per-file header convention for `src/**`, `tests/**`, `python/hanna/**`, `scripts/**`; cloning protocol for files descending from Harlo.
+
+**Decision.** The NOTICE clause *"each cloned file retains its original Apache 2.0 header"* is read **literally**: cloned files inherit whatever per-file header the Harlo original carries, including its absence. A survey of Harlo's full source tree (`src/*.py`, `src/computations/*.py`, `python/harlo/*.py`) shows **zero** files with a per-file Apache 2.0 header — every Harlo `.py` opens with a `"""docstring"""` or a `# Sprint N:` one-liner. The Apache 2.0 grant for Harlo applies via root `LICENSE`. Hanna inherits that posture.
+
+Concretely:
+
+1. **Cloned files** carry no Apache header — only the module docstring (preserved from Harlo) plus an attribution trailer comment immediately above the docstring:
+
+   ```python
+   # Cloned from Harlo (github.com/JosephOIbrahim/Harlo). Specialized for Hanna.
+   """Pure function: compute producer phase transitions."""
+   ```
+
+2. **Fresh Hanna files** (no Harlo ancestor) carry no header — just the module docstring.
+3. **Licensing** for all Hanna source applies via root `LICENSE` (Apache 2.0). Apache §4 requires `LICENSE` + `NOTICE` accompany the work; per-file boilerplate is recommended in the license appendix but is not required for the grant to attach. Harlo runs this pattern; Hanna inherits it.
+
+The four files that landed under the prior misreading — [`src/harlo_bridge.py`](../src/harlo_bridge.py), [`src/schemas.py`](../src/schemas.py), [`src/computations/compute_producer_phase.py`](../src/computations/compute_producer_phase.py), [`tests/computations/test_compute_producer_phase.py`](../tests/computations/test_compute_producer_phase.py) — are amended in the same commit to drop the 14-line header block. Attribution trailer preserved on the three cloned files; the test file (a fresh Hanna author) keeps only its docstring.
+
+[`NOTICE`](../NOTICE) gains one clarifying paragraph appended to the existing "retains" block, naming the literal reading and pointing at this decision.
+
+**Reasoning.** Three findings forced the reconciliation:
+
+1. **Empirical mismatch.** NOTICE's *"retains its original Apache 2.0 header"* implies Harlo originals carry headers. Survey: zero do. The misread was mine in Session 02 — I added headers to Hanna files thinking I was preserving an original; there was no original to preserve.
+2. **Legal sufficiency.** Apache 2.0 §4 requires `LICENSE` + `NOTICE` accompany the work (both present at Hanna root). Per-file boilerplate is recommended-not-required. Harlo (also Apache 2.0) runs the no-headers pattern without issue.
+3. **Operational cost.** The full Apache boilerplate is 14 lines per file. In Session 02 it consumed 44 of the 130-line scaffold budget and forced docstring trims at the cap. The same tax recurs on every cloned-pair session ahead (`compute_brief_priority`, `compute_forcing_function`, `compute_formation_readiness`, `delegate_producer`, `octavius_bridge`). Removing headers reclaims budget for content.
+
+Alternative considered: keep per-file headers and raise per-session line caps. Rejected — adds a two-layer rule (count lines, but exclude headers) and worsens diff hygiene (clones lead with 14 lines of boilerplate before the actual cloned content).
+
+This reconciliation follows the same pattern as D001 (Rule 35): an existing artifact (`NOTICE` / `RULES.md` Rule 35) is read literally rather than expansively, and the literal reading turns out to match the substrate's actual needs.
+
+**Implications.**
+
+- 4 files amended in the ratifying commit (drop Apache block, preserve docstring; preserve attribution trailer on the 3 clones).
+- [`NOTICE`](../NOTICE) gains a clarifying paragraph in the same commit.
+- Session 02 net line count drops from 130 → ~86, well under target.
+- Future clone sessions plan line budgets against content, not boilerplate.
+- D002's compliance reviewer expert checks the attribution trailer on cloned files (within first 20 lines) as part of its rule-compliance pass — adds one line to the reviewer's checklist.
+- Fresh Hanna files (no Harlo ancestor) explicitly require no header. The attribution trailer is the *only* per-file marker the substrate requires, and only on clones.
+
+**Related.**
+
+- D001 — same "literal reading of an existing artifact" reconciliation pattern.
+- D002 — MoE compliance reviewer surface (gains attribution-trailer check).
+- [`NOTICE`](../NOTICE) (root) — clarifying paragraph in the same commit.
+- Session 02 scaffold commit `e7ac833` on `session-02-scaffold` — surfaced this via the 130-line budget overrun.
+- Harlo's [`LICENSE`](https://github.com/JosephOIbrahim/Harlo/blob/main/LICENSE) and [`NOTICE`](https://github.com/JosephOIbrahim/Harlo/blob/main/NOTICE) files — the inherited pattern.
+
+---
+
 ## End of decisions log
 
-Next decision number: **D003**.
+Next decision number: **D004**.

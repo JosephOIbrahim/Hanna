@@ -18,5 +18,11 @@ attribution line:
 
     # Cloned from Harlo (github.com/JosephOIbrahim/Harlo). Specialized for Hanna.
 
+In practice, Harlo source files do not carry per-file Apache headers; cloned
+files therefore inherit that absence, and the attribution trailer is the only
+required per-file marker. Licensing for all Hanna source applies via the
+LICENSE file at this repo root. See `docs/DECISIONS.md` D003 for the literal
+reading of the "retains" clause and the empirical survey that motivated it.
+
 The two repositories share no git history after the initial clone — Hanna
 diverges immediately into producer-specific specializations.
