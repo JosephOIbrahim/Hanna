@@ -1,15 +1,42 @@
 # Hanna — Architectural Blueprint
 
-**Version:** 0.1.0-draft
-**Status:** Pre-recon. Awaiting Session 1 observations.
+**Version:** 0.2.0-audit
+**Status:** Pre-scaffold. First-principles audit applied 2026-05-20 (see Audit Log below).
 **Provenance:** Cloned from Harlo (`github.com/JosephOIbrahim/Harlo`). Specialized for producer-rhythm.
 **License:** Apache 2.0 (matches Harlo).
 **Architect:** Joe (Joseph Ibrahim).
 
 ---
 
+## Audit Log
+
+### 2026-05-20 — First-principles audit, three lenses, one finding
+
+Three independent agents (inheritance, surface, build sequence) read the v0.1.0 blueprint cold and converged on the same root issue: **this blueprint is speculative architecture against an unverified Harlo edge, with substrate inheritance that is mostly decoration for the actual workload.**
+
+Six findings, integrated into the sections below:
+
+1. **Harlo bridge contract is fictional.** v0.1.0 §9 commits `harlo_bridge.py` to call `read_state` / `read_prediction` / `read_burnout_level`. Harlo's actually-exposed MCP tools are `coach`, `status`, `recall`, `store`, `patterns` (plus three more). The named methods do not exist on the Harlo side. The bridge contract must be reconciled with the real surface before any bridge code ships. **Open decision §12.5.** Affects §9.
+
+2. **Substrate inheritance is over-scoped for the workload.** Hanna's workload is ~10 briefs/week × ~2KB, six events/day on a wall clock. Harlo's substrate (1-bit SDRs, sub-2ms PyO3 hot path, hippocampal apoptosis, Merkle composition, ONNX encoders) was sized for sub-second cognitive memory under continuous load. SQLite + JSON files + `time.time()` dominate on every axis at Hanna's volume. §4 inheritance table now carries Keep / Cut / Review status per item.
+
+3. **The single load-bearing inheritance is the pure-function-over-enum pattern** (the shape of `compute_burst.py` / `compute_momentum.py`). It structurally enforces Rule 36 ("surface, don't decide") because pure enum returns cannot side-effect. Cloning more than this needs concrete justification. §4 marks this as the keep-at-all-costs piece.
+
+4. **"Always-on producer" contradicts MCP-tools-only.** MCP tools fire only when Joe opens a Claude session. A producer that only speaks when spoken to is a logbook. The committed channel (browser-rendered brief) is also the wrong landing zone for a creative director who lives in Houdini and on iPhone. Channel choice is now **open decision §12.6** and must be one-day-tested before another design session.
+
+5. **Input surface is missing.** v0.1.0 is silent on where portfolio state (deadlines, blockers, formation freshness) comes from. Briefs are downstream of state; state has to come from somewhere. **New §5.6 Input surface** sketches the lowest-friction shape (Calendar reads, per-product `.md` files, conversational `hanna_log` / `hanna_block` MCP tools).
+
+6. **Day-zero should ship in one session, not eight.** v0.1.0 §11 day-zero is the *end* of 8+ lane sessions. A smaller end-to-end PoC — call Harlo's real `coach` tool, inline lockout, one stage prim, print one brief — touches every contract in ~80 lines. **§11 now carries this as the primary day-zero**; the long-form version is the post-PoC target.
+
+Audit findings are proposals, not unilateral decisions. Joe ratifies each one before the corresponding code lands. Where a finding is still open, it is named in §12.
+
+**Convergent recommendation:** verify the surface (Harlo edge + delivery channel) before cloning more shape onto it.
+
+---
+
 ## Table of Contents
 
+0. [Audit Log](#audit-log) — first-principles audit findings (2026-05-20)
 1. [Identity](#1-identity)
 2. [Relationship to Harlo](#2-relationship-to-harlo)
 3. [Repo posture](#3-repo-posture)
@@ -66,7 +93,7 @@ Each substrate stays single-purpose:
 - **Default branch:** `main`, protected.
 - **Feature flag:** `PRODUCER_ENABLED`, mirrors Harlo's `ENGINE_ENABLED` precedent.
 - **Branch model:** trunk-based with feature flags. Feature branches for lane-scoped work, merged behind the flag.
-- **Venv topology:** dual venv inherited verbatim from Harlo. 3.12 USD venv, 3.14 project venv.
+- **Venv topology:** v0.1.0 inherited the dual venv (3.12 USD / 3.14 project) verbatim from Harlo. **Audit 2026-05-20:** dual venv is build-system tax for a USD dependency Hanna may not need (see §4 status). Decision parked until §4 USD status resolves.
 
 The clone is a **starting point**, not a destination. Within the first sprint, Hanna diverges:
 
@@ -80,21 +107,22 @@ After the initial clone commit, the two repos do not share git history.
 
 ## 4. Substrate inheritance
 
-What carries from Harlo unchanged:
+What carries from Harlo. **Audit 2026-05-20:** added Audit Status per item. Items marked Cut or Review require Joe's ratification before removal — until then, the v0.1.0 clone posture stands.
 
-| Component | Status |
-|---|---|
-| Pure-function computation pattern (`src/computations/*.py`) | Pattern + scaffolding cloned |
-| Hydra delegate pattern (`src/delegate_*.py`) | Pattern + base class cloned |
-| MCP server + tool registration | Module structure cloned, renamed `hanna/mcp_server.py` |
-| USD stage architecture | Verbatim |
-| Hot tier (FTS5) / warm tier (SDR) / cold tier (USD) | Verbatim |
-| XGBoost predictor harness | Verbatim. Retrained on producer signals. |
-| Dual venv (3.12 USD / 3.14 project) | Verbatim |
-| Test discipline (pytest, mirror tree, biological-fidelity gates) | Verbatim |
-| The 33 inviolable rules | **Inherited.** Producer-specific addendum may be added in Session 1 recon. |
-| RED-state override | Verbatim. Joe's RED state, read via Harlo bridge, still overrides Hanna. |
-| Apache 2.0 headers and `NOTICE` | Updated to reflect Hanna attribution to Harlo. |
+| Component | v0.1.0 plan | Audit status | Rationale |
+|---|---|---|---|
+| Pure-function computation pattern (`src/computations/*.py`) | Pattern + scaffolding cloned | **Keep — load-bearing** | Structurally enforces Rule 36 ("surface, don't decide") — pure enum returns cannot side-effect. The one inheritance that earns its keep at all costs. |
+| FastMCP server + structured-JSON tool returns | Module structure cloned, renamed `hanna/mcp_server.py` | **Keep** | The tool-call substrate is real. Renaming holds. |
+| RED-state override (Rule 18) routed via Harlo bridge | Verbatim | **Keep** | Rule 18 actually lives here; the override is non-negotiable. |
+| Test discipline (pytest, mirror tree) | Verbatim | **Keep** | Biological-fidelity gates apply selectively — only where the function shape matches. |
+| Apache 2.0 headers and `NOTICE` | Updated for Hanna attribution | **Keep** | Already shipped. |
+| Hydra delegate pattern (`src/delegate_*.py`) | Pattern + base class cloned | **Cut (pending ratification)** | Designed for routing tasks across model backends with capability negotiation. Hanna calls Claude. One backend = indirection in search of a purpose; the delegate adds a layer that has to be threaded through every MCP tool to satisfy Rule 34's "second layer." |
+| USD stage architecture | Verbatim | **Cut (pending ratification)** | USD is a stage-composition language for film pipelines. Hanna's corpus is ~10 briefs/week × ~2KB. SQLite + JSON dominates on every axis at this volume. Using USD to time-sample "did we ship the morning brief" is a category error. |
+| Hot tier (FTS5) / warm tier (SDR) / cold tier (USD) | Verbatim | **Cut (pending ratification)** | Three-tier storage sized for sub-2ms cognitive recall under continuous load. Hanna's latency budget is "before coffee gets cold." One SQLite file per table is the whole job. |
+| Rust hot path via PyO3 | Inherited via cloned crates | **Cut (pending ratification)** | No hot path exists. Hanna runs six events/day on a wall clock. Python loop is faster to write, debug, and reason about. |
+| XGBoost predictor harness | Verbatim. Retrained on producer signals. | **Cut (pending ratification)** | Cold-start bootstrap admits no training data exists and won't for months. A hand-coded heuristic ("deadline within 5 working days × in-flight product count") outperforms an undertrained model and ships in 30 minutes. |
+| Dual venv (3.12 USD / 3.14 project) | Verbatim | **Cut (pending ratification)** | Falls out automatically once USD is cut. Build-system tax with no payoff. |
+| The 33 inviolable rules | **Inherited.** Producer addenda 34–37 added in Session 01.5. | **Review** | Rules 34–37 (producer addenda) are Hanna's own and stay. Rules 1–8, 11–17, 19–33 are guardrails for code that doesn't exist in Hanna (hippocampal mutation, motor reflex compilation, inquiry verification). Their compliance greps in `RULES.md` pass trivially because the constrained code isn't there — that's a green CI light meaning nothing, not safety. Selectively re-adopt rules as the underlying components actually land. Rule 18 (RED override) is the exception and stays now. |
 
 ---
 
@@ -161,8 +189,33 @@ Hanna authors to its own stage, in the `/hanna/*` namespace. It never authors to
 
 ### New bridge modules
 
-- `src/harlo_bridge.py` — read-only MCP client to Harlo for Joe's cognitive state.
+- `src/harlo_bridge.py` — read-only MCP client to Harlo for Joe's cognitive state. **Audit 2026-05-20:** see §9 — the v0.1.0 method names (`read_state` / `read_prediction` / `read_burnout_level`) do not match Harlo's actually-exposed MCP tools. Contract reconciliation is a precondition for this module landing. See open decision §12.5.
 - `src/octavius_bridge.py` — spawns Octavius formations via subprocess + MCP-over-stdio.
+
+### Input surface (added 2026-05-20 audit)
+
+v0.1.0 of this blueprint was silent on where portfolio state comes from. Briefs and capsules are *outputs* — Hanna cannot compose them without knowing what's in flight, what's blocking, and what deadlines are approaching. The missing surface, in three layers from lowest-friction to highest:
+
+1. **Calendar reads.** Hanna reads Joe's existing calendar(s) over Google Calendar / Apple Calendar APIs and treats dated events tagged with portfolio-product keywords as forcing functions. Read-only. Joe schedules in the tools he already uses.
+2. **Per-product Markdown files.** One `.md` per portfolio product, watched by Hanna. Joe edits these directly when state changes ("Moneta parked until Q3", "Synapse waiting on Houdini 21"). File mtime is the freshness signal. Lives at `data/products/{harlo, octavius, moneta, comfy_cozy, ...}.md`.
+3. **Conversational MCP tools.** `hanna_log("free text observation")`, `hanna_block("free text blocker on product X")`, `hanna_unblock("product X")` — invoked from any Claude session so a single sentence becomes producer state. These mutate Hanna's own stage only (never Harlo, never Octavius beyond the contract).
+
+Decision on which combination ships first: see open decision §12.7. None of the three is incompatible with the others; the question is sequencing and minimum-viable input set for the first useful brief.
+
+### Producer UI Surface
+
+Web-rendered briefs and capsules. Static HTML mockup at
+`Hanna/web/templates/morning_brief.html` is the design source of truth.
+
+**Audit 2026-05-20:** the delivery channel itself is now an open decision (§12.6). The HTML system survives as design *reference* for any channel that has a layout — but the immediate delivery channel for v1 briefs may be iMessage, `osascript display notification`, a menubar app, or a Calendar event, none of which can host the editorial canvas. **Posture (restraint, no red, deliberate negative space, calm typography) transfers across channels. The 920px asymmetric-gutter kit does not.**
+
+**Phase 1 (current):** Static mockup committed as design reference.
+**Phase 2:** Templates parameterized against producer MCP tool output (only if the channel decision lands on browser).
+**Phase 3:** Lightweight HTTP surface serving the UI locally (same conditional).
+
+Design system documented in `Hanna/web/README.md` — Pentagram-inspired mono-forward typography (JetBrains Mono + Manrope), muted earth-cool palette with seven functional colors, asymmetric gutter layout, Notion-style structural elements (properties, callouts, mention pills, backlinks).
+
+Family-first lockout, cross-substrate read-only, and Rule 37 inherit to this surface.
 
 ---
 
@@ -216,7 +269,11 @@ Cold start: open decision in §12. Default is bootstrap from Harlo predictor for
 
 ### To Harlo (`src/harlo_bridge.py`)
 
-- `harlo.read_state()` → current cognitive state snapshot. Cached with TTL (default 5 min, open decision §12).
+> **Audit 2026-05-20 — contract mismatch flagged.** The method names below were specified before Harlo's actually-exposed MCP tools were checked. Harlo's real surface is `coach`, `status`, `recall`, `store`, `patterns` (plus three more). `read_state` / `read_prediction` / `read_burnout_level` do not exist on the Harlo side. **Precondition for any bridge code:** a ~30-minute spike calls Harlo's real tools over MCP-stdio and reports back what each returns. The bridge is then either (a) renamed to call the real tools directly, (b) implemented as a small composition over real tools (e.g. `read_state := coach + status + recall(...)`), or (c) blocked pending a blueprint change. See open decision §12.5.
+
+The v0.1.0 contract below is preserved as the *intent* — what Hanna wants to read — pending reconciliation with what Harlo actually exposes:
+
+- `harlo.read_state()` → current cognitive state snapshot. Cached with TTL (default 5 min, open decision §12.1).
 - `harlo.read_prediction()` → XGBoost 3-step forecast.
 - `harlo.read_burnout_level()` → cheap, called often before any brief composition.
 - **Hard rule:** if Harlo is unreachable, Hanna degrades to state-blind mode. Serves cached briefs. Refuses formation requests. Never fabricates state.
@@ -246,42 +303,65 @@ Hanna is built in lanes. Lanes may be parallelized across Code sessions after th
 | `tests` | Cross-lane integration tests, biological-fidelity gates | All implementation lanes |
 | `day_zero` | `scripts/first_hanna_brief.py` end-to-end | All other lanes |
 
-Build order: `recon` → scaffold all lanes → fill `computations` + `harlo_bridge` in parallel → fill `delegate` → fill `mcp_tools` → fill `octavius_bridge` → fill `stage` → integrate → `day_zero`.
+Build order (v0.1.0): `recon` → scaffold all lanes → fill `computations` + `harlo_bridge` in parallel → fill `delegate` → fill `mcp_tools` → fill `octavius_bridge` → fill `stage` → integrate → `day_zero`.
 
-Single-agent build serializes the lanes. Multi-agent build parallelizes after scaffold. **Start single-agent.**
+**Audit 2026-05-20 — revised build order.** The v0.1.0 order treats the Harlo edge as just one lane among several, but every downstream lane depends on the Harlo contract being real. Revised order, leading with verification:
+
+1. **`harlo_edge_spike`** *(new, ~30 min)* — call Harlo's actual MCP tools (`coach`, `status`, `recall`) and confirm whether the v0.1.0 `read_state`/`read_prediction`/`read_burnout_level` contract is achievable. Output: a one-page note in `docs/` that either confirms the contract, redefines it as a composition, or escalates a blueprint change. *Until this completes, every other lane is speculative.*
+2. **`first_brief_poc`** *(new, ~1 session)* — the smaller day-zero per §11. Inline lockout, real Harlo tool call, one stage prim (or SQLite row if §4 USD status resolves Cut), composed brief printed to stdout. Touches every contract end-to-end in ~80 lines. *Validates the architecture before the lanes refactor it.*
+3. `recon` ✓ (shipped) → `rules` ✓ (shipped) → `web` ✓ (Phase-1 reference shipped) → `computations` → `harlo_bridge` *(refactor the spike into a proper module)* → `delegate` *(only if §4 Hydra status resolves Keep)* → `mcp_tools` → `octavius_bridge` → `stage` *(only if §4 USD status resolves Keep)* → `day_zero` long-form.
+
+Multi-agent parallelism flips on when three conditions hold *simultaneously*: (a) the Harlo edge is verified end-to-end (not assumed), (b) the brief-write path is exercised once with a real persisted artifact, (c) at least two lanes share no dependency edge in the *live* code (not just on the lane diagram). Before that, parallelism is three agents stubbing against the same unverified contract. **Start single-agent. Promote to multi-agent only after `first_brief_poc` runs green.**
 
 ---
 
 ## 11. Day-zero deliverable
 
-`scripts/first_hanna_brief.py`:
+**Audit 2026-05-20:** day-zero now has two variants. The smaller PoC ships first, in one session, and validates every contract end-to-end before the lanes refactor it. The long-form day-zero remains the target shape — but it is reached *after* the architecture is proven, not as a leap of faith over eight sessions of lane filling.
+
+### 11.1 Primary day-zero — smaller PoC (one session, ~80 lines)
+
+`scripts/first_hanna_brief.py`, written inline with no module decomposition:
+
+1. **Call Harlo's actual `coach` tool** over MCP-stdio (proves the read edge with real tools, not blueprint names). Print what comes back so the contract is observable.
+2. **Inline producer phase** — `phase = FAMILY_LOCKOUT if outside Mon–Fri 09:00–17:00 ET else MORNING`. One conditional. Proves the lockout primitive without a clone ceremony.
+3. **Author one timestamped artifact.** If §4 USD status resolves Keep: `Usd.Stage.CreateNew("data/stages/hanna.usda")` + `DefinePrim("/hanna/daily/brief", "Scope")` + one attribute. If §4 USD status resolves Cut: one row in `data/hanna.sqlite` `briefs` table. Either way: one persisted artifact, observable on disk.
+4. **Print the composed brief** to stdout. Markdown body, two paragraphs max.
+
+Four contracts touched (Harlo read, lockout enforcement, persisted artifact, composed output). Zero MCP server, zero delegate, zero subprocess. If this runs in one session, Hanna is real that session. **Success criterion: the architecture has been validated end-to-end before any lane absorbs it.**
+
+### 11.2 Long-form day-zero (post-PoC target)
+
+`scripts/first_hanna_brief.py`, after the lanes refactor the inline pieces into proper modules:
 
 1. Boot Hanna with `PRODUCER_ENABLED=true`.
-2. Read Joe's state from Harlo via `harlo_bridge`.
-3. Compute producer phase.
+2. Read Joe's state from Harlo via `harlo_bridge` *(now backed by the contract proven in §11.1)*.
+3. Compute producer phase *(now via `compute_producer_phase`, not inline)*.
 4. Compute brief priority across portfolio products.
-5. Author `/hanna/daily/brief` to stage with timestamp.
+5. Author `/hanna/daily/brief` to stage with timestamp *(persistence layer per §4 resolution)*.
 6. Return the brief as a single composed message to stdout.
 
-Success criterion: this script runs against a live Harlo session and returns a state-aware brief authored to stage. If this runs, Hanna is real. The rest is iteration.
+This shape is reached when the lanes have absorbed §11.1's inline pieces *and* the §4 inheritance decisions have resolved. Not before.
 
 ---
 
 ## 12. Open decisions
 
-Smaller list than the inside-Harlo architecture — the new-repo posture resolves several.
+**Audit 2026-05-20:** the v0.1.0 list (§12.1–4) is preserved unchanged. The audit added §12.5–8, several of which dominate the v0.1.0 items in priority. The four newly-added decisions should resolve *before code lands*; the original four can defer further.
 
-1. **Harlo state staleness TTL** — 5 min default cache, or event-driven via Harlo MCP push notification?
-2. **Capsule write-through** — does Hanna mirror evening capsules into Harlo's stage as well, or stay private?
-3. **Formation authorization** — does `hanna_request_formation` need OOB consent (HMAC + TTL), or is trusted-localhost trust boundary enough?
-4. **Predictor cold-start** — retrain from scratch on synthetic producer signals, or bootstrap from Harlo's predictor for the first weeks and substitute later?
+### Original (v0.1.0)
 
-Default assumptions if not told (each is reversible later):
+1. **Harlo state staleness TTL** — 5 min default cache, or event-driven via Harlo MCP push notification? *Default: TTL of 5 minutes, polled.* **Audit note:** this question presumes the Harlo contract is real, which §12.5 has not confirmed yet — TTL falls out of contract resolution.
+2. **Capsule write-through** — does Hanna mirror evening capsules into Harlo's stage as well, or stay private? *Default: capsules stay private to Hanna. No write-through.* Defers indefinitely until capsule shape exists.
+3. **Formation authorization** — does `hanna_request_formation` need OOB consent (HMAC + TTL), or is trusted-localhost trust boundary enough? *Default: trusted-localhost. HMAC added when Hanna runs over network.* Defers until Hanna ships over network.
+4. **Predictor cold-start** — retrain from scratch on synthetic producer signals, or bootstrap from Harlo's predictor for the first weeks and substitute later? *Default: bootstrap from Harlo's predictor.* **Audit note:** moot if §4 XGBoost status resolves Cut.
 
-1. TTL of 5 minutes, polled.
-2. Capsules stay private to Hanna. No write-through.
-3. Trusted-localhost. HMAC added when Hanna runs over network.
-4. Bootstrap from Harlo's predictor. Substitute at sufficient signal.
+### Added by 2026-05-20 audit
+
+5. **Harlo bridge contract reconciliation (blocking).** v0.1.0 names `read_state`, `read_prediction`, `read_burnout_level`. Harlo's actually-exposed tools are `coach`, `status`, `recall`, `store`, `patterns`, plus three more. Resolution: a ~30-min spike (per §10 `harlo_edge_spike`) determines whether the v0.1.0 names are achievable as compositions over real tools, or whether the bridge contract must change. *No default — must resolve before any bridge code lands.*
+6. **Delivery channel for v1 briefs (blocking-ish).** The "always-on producer" claim contradicts an MCP-tools-only surface (Joe has to open a Claude session to hear from the producer). Candidates: browser (current Phase-1 mockup target), iMessage via Shortcuts, `osascript display notification` (macOS native), menubar app, Calendar event auto-creation, Houdini shelf tool. *Default: one-day channel test — hand-author three days of fake briefs, ship via the cheapest channel(s), observe which Joe actually acts on vs. swipes. Decision lands after that test.* **Sender naming note:** if iMessage wins, the contact name needs to be unambiguously not-a-person (e.g. `Hanna · Producer`) to avoid family confusion.
+7. **Input surface — minimum viable set (blocking).** Briefs can't compose without inputs. Three candidate input layers (§5.6): Calendar reads, per-product `.md` files, conversational `hanna_log` / `hanna_block` MCP tools. *Default: per-product `.md` files first (lowest implementation cost, zero external API surface), Calendar reads second, conversational tools third.* Decision lands when the §11.1 PoC needs real input to compose its first brief.
+8. **§4 inheritance ratification.** §4 now carries Cut / Review status on most inherited components (Hydra delegate, USD stage, three-tier storage, Rust hot path, XGBoost, dual venv, Rules 1–33 verbatim). Joe ratifies each Cut / Review item before the corresponding component is removed or selectively re-adopted. *Default per item is the status currently in §4; explicit ratification required to commit.*
 
 ---
 
