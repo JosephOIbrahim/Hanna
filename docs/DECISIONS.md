@@ -80,6 +80,80 @@ The `coach` edge case was the closest call. `coach` does author content (a trace
 
 ---
 
+### D002 — Mixture-of-Experts agent-team execution model for substrate-level work
+
+**Status:** resolved
+**Date:** 2026-05-20
+**Ratified by:** Joe (Joseph Ibrahim)
+**Scope:** Build execution methodology across all substrate-level work in this repo (bridges, computations, MCP tools, stage authoring, day-zero deliverables, cross-cutting refactors). Applies to every Code session unless explicitly overridden in the session prompt.
+
+**Decision.** Substrate-level work on Hanna is executed via parallelized Claude subagents in role-specialized "expert" configurations, not as single-thread implementation. The main Code thread acts as **router and integrator** — it receives the task, decomposes it into expert slices, dispatches experts (in parallel where dependencies allow), integrates outputs, runs a final compliance pass via a dedicated reviewer expert, applies fixes, and commits.
+
+**Expert roles (the MoE taxonomy):**
+
+| Role | Specialty | Triggers when… |
+|---|---|---|
+| **Architect** | File structure, interfaces, contract design, integration shape | Default; held by the main thread unless explicitly dispatched |
+| **Bridge engineer** | MCP-stdio surfaces, Harlo / Octavius edges, Rule 35 boundary, the v9 envelope | `src/harlo_bridge.py`, `src/octavius_bridge.py`, or any code that opens a subprocess MCP client |
+| **Computation engineer** | Pure functions, state machines, enum returns, Rule 36 enforcement | `src/computations/*.py` |
+| **Stage engineer** | Persistence layer (SQLite per §4 audit / USD per §4 pre-audit), schema, prim authoring | `src/store.py`, `data/`, any persistence code |
+| **Brief composer** | Markdown composition, editorial voice, "surface don't decide" framing (Rule 36) | Any code that generates user-facing brief / capsule text |
+| **MCP surface engineer** | FastMCP server, tool registration, lockout gating, structured-JSON returns | `src/mcp_server.py`, `hanna_*` tool implementations |
+| **Compliance reviewer** | Audits against RULES.md (especially 18, 34, 35, 36, 37), DECISIONS.md, BLUEPRINT.md contracts, compliance greps | **Mandatory final pass on every MoE execution.** Never skipped. |
+
+**When MoE applies:**
+
+- Substrate-level work that touches ≥2 expert roles
+- Day-zero deliverables and PoCs
+- Cross-cutting refactors (changes touching multiple lanes per BLUEPRINT §10)
+- Any work that lands code in `src/`, `scripts/`, or `python/hanna/`
+
+**When MoE does NOT apply:**
+
+- Trivial fixes (single-line edits, doc typos, lint cleanups)
+- Exploratory spikes (single agent or main thread; spike outputs are docs, not code)
+- Personal-context updates (memory writes, `NEXT.md`, `CLAUDE.md`, `docs/CONVENTIONS.md`)
+- Substrate decisions themselves (entries to this file are author-by-main-thread, ratified by Joe directly)
+
+**Coordination protocol:**
+
+1. **Decompose.** Main thread reads the task, identifies which expert roles are needed, defines each slice as a self-contained brief that the expert can read cold (the expert does not see the parent conversation).
+2. **Dispatch.** Builder experts run in **parallel** where dependencies allow. Where one expert's output is consumed by another (e.g. PoC consumes Bridge), the downstream expert codes against the *spec*, not against the upstream expert's actual artifact — keeps the team parallel even with logical ordering.
+3. **Integrate.** Builder experts may write files directly (saves a re-typing round-trip) OR return code as their final message for the main thread to Write. Main thread chooses per task — direct-write for clean greenfield, return-as-message when integration logic is needed.
+4. **Review.** Compliance reviewer runs **last and alone** — never in parallel with builders. Reads the integrated artifacts. Returns PASS items, FAIL items, and RECOMMENDED-CHANGES. The reviewer's job is to catch what no builder could see (cross-file consistency, rule compliance, dead code, contract drift).
+5. **Apply fixes.** Main thread applies the reviewer's RECOMMENDED-CHANGES via Edit. If the reviewer found a structural FAIL (not a fix-in-place issue), the main thread re-dispatches the affected expert.
+6. **Commit.** Single commit per MoE execution, with a body that names the dispatched experts and links to the reviewer's audit. Use the canonical Claude Code trailer.
+
+**Hard constraints inherited by every expert:**
+
+- **Rule 35** (per D001): experts must never expose or invoke methods that call `store`, `stage_reload`, `resolve_verifications`, `trigger_cognitive_recalibration` on Harlo's MCP surface.
+- **Rule 37**: experts must not raise patent topics under any framing.
+- **Rule 34**: experts implementing MCP tools must include the family-first lockout gate.
+- **Rule 36**: experts producing user-facing output must frame as surfaced observation, not directive.
+- **Canonical commit trailer**: every commit produced by the MoE flow uses the canonical Claude Code trailer (`Co-Authored-By: Claude <noreply@anthropic.com>`).
+
+**Reasoning.** The 2026-05-20 first-principles audit established that Hanna's substrate decisions involve genuinely different expertise lenses — Harlo-edge contract reading, pure-function discipline, persistence-layer trade-offs, editorial composition voice, compliance against an inviolable rule set. A single-thread implementation collapses these into one cognitive context and loses the specialization gain. Parallelized experts working from self-contained briefs produce sharper, more honest output (corroborated by the audit itself — three independent agents reading cold reached a stronger conclusion than a single synthesizer would have). MoE also matches the architectural posture of Hanna (a producer that surfaces parallel work streams) — the build methodology mirrors the build product.
+
+The router-integrator pattern keeps human-meaningful control in the main thread: experts produce, the router decides what lands. Reviewer-last ensures no expert sees its own work uncritically; cross-file consistency comes from a dedicated set of eyes.
+
+**Implications.**
+
+- Code sessions involving substrate-level work spawn ≥2 builder experts + 1 reviewer expert by default.
+- The main thread does not write production code in `src/` directly; it integrates expert outputs.
+- The reviewer pass is non-skippable and must run after every MoE execution. A green reviewer pass is the gate for commit.
+- Builder experts' prompts must be self-contained — full context for cold reads, no reliance on parent-conversation state.
+- The MoE flow is logged in the resulting commit body (which experts dispatched, what reviewer flagged, what was fixed).
+- This decision is itself executable: D002 governs how D003+ get implemented when they touch code.
+
+**Related.**
+
+- [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §10 build lanes (the MoE roles parallel the lane taxonomy), §13 inherited rules (the constraints every expert carries).
+- [`RULES.md`](../RULES.md) Rules 18, 34, 35, 36, 37 (compliance reviewer's audit surface).
+- D001 (Rule 35 permissive reading — inherited as a hard constraint by every Bridge expert dispatch).
+- The 2026-05-20 first-principles audit (three independent agents) is the proof-of-concept demonstration of the pattern.
+
+---
+
 ## End of decisions log
 
-Next decision number: **D002**.
+Next decision number: **D003**.
