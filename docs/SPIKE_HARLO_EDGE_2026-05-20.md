@@ -176,19 +176,19 @@ The spike surfaced an interpretive question that needs Joe's ratification before
 
 **Recommendation:** permissive reading, with the bridge explicit about it. `drive_coaching_exchange` is rate-limited (at most once per Hanna brief composition) and documented as "Hanna participates in a Harlo exchange to read fresh prediction; Harlo's record of this participation is observation, not authored content."
 
-Either reading needs to be a ratified entry in `docs/DECISIONS.md` before bridge code lands. **Currently unresolved.**
+**RATIFIED 2026-05-20 — see [`DECISIONS.md`](DECISIONS.md) D001.** The permissive reading is the active interpretation. The four forbidden tools are `store`, `stage_reload`, `resolve_verifications`, `trigger_cognitive_recalibration`. `coach` is permitted, rate-limited to ≤1 call per brief composition.
 
 ---
 
 ## 8. Resolution of audit §12.5
 
-**§12.5 (Harlo bridge contract reconciliation) — RESOLVED, pending one ratification.**
+**§12.5 (Harlo bridge contract reconciliation) — FULLY RESOLVED 2026-05-20.**
 
 - v0.1.0 method names are kept (they describe Hanna's intent).
 - v0.1.0 implementations are revised to call `status` (cheap) and `coach` (heavy), per §6.
 - New method `drive_coaching_exchange` is added for the rare "drive fresh prediction" case.
 - New method `read_schedule` falls out for free from the v9 envelope.
-- Rule 35 interpretation re `coach` calls remains open (§7) — **the single blocker** before bridge code lands.
+- Rule 35 interpretation re `coach` calls — **RATIFIED** (permissive reading) in [`DECISIONS.md`](DECISIONS.md) D001. The bridge is unblocked end-to-end.
 
 Other audit decisions affected:
 
@@ -200,11 +200,11 @@ Other audit decisions affected:
 
 ## 9. What's next
 
-1. **Joe ratifies the Rule 35 reading of `coach`** in `docs/DECISIONS.md` — strict or permissive. This is the only blocker.
+1. ~~Joe ratifies the Rule 35 reading of `coach` in `docs/DECISIONS.md`~~ — **DONE 2026-05-20 ([`DECISIONS.md`](DECISIONS.md) D001, permissive reading).**
 2. Bridge code lands following §6's contract.
 3. The smaller day-zero PoC (§11.1) can then write `scripts/first_hanna_brief.py` using the real bridge end-to-end.
 
-**No further spikes needed before first bridge code.**
+**No further spikes needed before first bridge code. No remaining blockers.**
 
 ---
 
