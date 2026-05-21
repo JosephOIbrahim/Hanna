@@ -2,42 +2,69 @@
 
 ## Where you are
 
-- Branch: `session-01.5-rules` (HEAD = `cbe30b5`).
-- Branches in repo: `session-01-recon`, `session-01.5-rules`. **No `main` yet.**
-- Session 01.5 approved 2026-05-13 17:46 ET. Session 02 starts tomorrow morning.
+- Branch: `main` (HEAD = `4dcc36b`).
+- Origin: `github.com/JosephOIbrahim/Hanna` — main pushed, `session-02-scaffold` pushed for history.
+- Session 02 closed out 2026-05-20.
 
-## Decision parked
+## Session 02 receipts
 
-**Trunk:** merge `session-01-recon` + `session-01.5-rules` into a `main` branch before Session 02 starts, or branch `session-02-scaffold` directly off `session-01.5-rules` and defer the trunk question? No default — surface to Joe at session start.
+- `session-02-scaffold` merged `--ff-only` into main:
+  - `e7ac833` — feat(computations): scaffold `compute_producer_phase` (Session 02).
+  - `732b676` — docs(decisions,notice): ratify D003 — drop per-file Apache headers.
+- Net line count: **90** (target ~100; cap 130).
+- Tests: **7 / 7 pass** (`Harlo/.venv314/bin/python -m pytest tests/computations/`).
+- All 7 phase branches in `src/computations/compute_producer_phase.py` raise `NotImplementedError("Session 03")`.
 
-## Session 02 first deliverable (per Session 01 §F)
+## Decisions ratified
 
-- Clone `Harlo/src/computations/compute_burst.py` → `Hanna/src/computations/compute_producer_phase.py`.
-- Define `ProducerPhase` enum in `Hanna/src/schemas.py`.
-- Test stub at `Hanna/tests/computations/test_compute_producer_phase.py` (mirror-tree per `docs/CONVENTIONS.md` §1).
-- All transition bodies as `NotImplementedError("Session 03")`.
-- ~100 lines net. Stop for review.
+- **D003** — Apache header convention: clones inherit absence. NOTICE read literally; 4 files amended.
+- **D004** — Attribution-trailer hygiene at reviewer + conventions layers (commit `4dcc36b`).
+- Next decision number: **D005**.
 
-## Precondition flagged
+## Session 03 entry point
 
-`src/schemas.py` does not exist in Hanna yet. Session 02 starts by either:
+**First deliverable:** implement the 7 transition bodies in `src/computations/compute_producer_phase.py`. Each branch currently raises `NotImplementedError("Session 03")`. Target mapping:
 
-- **(a)** Cloning all of `Harlo/src/schemas.py` and adding `ProducerPhase`, or
-- **(b)** Creating a minimal `Hanna/src/schemas.py` with just `ProducerPhase` + only the imports `compute_producer_phase` needs.
+| Branch condition (current code) | Returns |
+|---|---|
+| `weekday() >= 5` or `hour ∉ [work_start, work_end)` | `ProducerPhase.FAMILY_LOCKOUT` |
+| `now.day == monthly_day` | `ProducerPhase.MONTHLY` |
+| `weekday() == 0 and hour == weekly_monday_hour` | `ProducerPhase.WEEKLY_MONDAY` |
+| `weekday() == 4 and hour == weekly_friday_hour` | `ProducerPhase.WEEKLY_FRIDAY` |
+| `hour < morning_end_hour` | `ProducerPhase.MORNING` |
+| `hour < midday_end_hour` | `ProducerPhase.MIDDAY` |
+| fallthrough | `ProducerPhase.EVENING` |
 
-Recommend **(b)** — clone-as-needed reduces inherited surface area. Surface to Joe at session start.
+Then convert the 7 stubs in `tests/computations/test_compute_producer_phase.py` from `pytest.raises(NotImplementedError)` to assertions on the returned `ProducerPhase` value. Per Harlo's `tests/test_sprint1/test_cogexec.py:4` precedent (and CONVENTIONS §1), each branch wants **≥3 cases** — boundary + interior + adjacent-day-or-hour — so the test file grows to ~21+ cases.
 
-## Open questions parked from Session 01 (do not act on; be aware)
+**Followups for Session 03 to surface:**
+
+- Lockout-window granularity: ET vs. UTC, holidays, half-days. If finer-grained than Mon–Fri 09–17 ET is needed, surface for D005.
+- Hanna still has no `pyproject.toml` / venv. Session 03 may want to establish one before the test suite grows; alternative is keep using Harlo's `.venv314` indefinitely.
+- `prev_phase` is currently a signature arg but unused in the spec table above. Session 03 will need to decide whether prev_phase informs the transition (e.g., hysteresis on phase flips at boundary hours) or is purely for symmetry with `compute_burst.py`'s pattern.
+
+## Parked for D005 — Harlo bridge hardening
+
+Two latent issues in `src/harlo_bridge.py` flagged during Session 02 but not addressed:
+
+- **`_read_frame` timeout is dead.** The `timeout` parameter is plumbed through `_rpc → _read_frame` but the body never references it (`src/harlo_bridge.py:175–201`). `proc.stdout.readline()` and `proc.stdout.read(content_length)` are blocking pipe reads. A hung Harlo subprocess freezes the bridge indefinitely. Day-zero PoC didn't surface this because the test paths didn't exercise hang scenarios.
+- **stderr is undrained.** `subprocess.Popen` opens with `stderr=subprocess.PIPE` (`src/harlo_bridge.py:130`) but no thread or call reads from it. Once Harlo writes ~64KB to stderr (OS pipe-buffer default), the subprocess blocks on the next stderr write — deadlocking the bridge.
+
+Both are bridge-hardening concerns, not Rule 35 issues. They want a substrate decision (**D005**) on how the bridge handles slow/hung/noisy Harlo subprocesses before the bridge sees production-style use. Candidate approaches to consider: (a) `select`/`selectors` with timeout, (b) background reader threads for stdout + stderr with queues, (c) replace stdio with a structured RPC framing that has built-in timeouts.
+
+## Open questions still parked
+
+(carried from prior NEXT)
 
 - **§C.2** — Octavius IPC PoC (deferred until `octavius_bridge` lane).
-- **§C.3** — Harlo MCP-client precedent (deferred until `harlo_bridge` lane).
+- **§C.3** — Harlo MCP-client precedent (partially addressed by §11.1 day-zero PoC; close out after Session 03 if no new questions surface).
 - **§C.4** — `LockoutResponse` shape (needed before `mcp_tools` lane).
 - **§C.6** — RED override in delegate dispatch (needed before `delegate` lane; ~5-min read of `Harlo/src/delegate_base.py` + `delegate_registry.py`).
 
-None of these block Session 02's first deliverable (a computation).
+None of these block Session 03's first deliverable.
 
-## Staleness flag — needs Joe's call at session start
+## Staleness flag — still carried
 
-Session 01 `docs/SESSION_01_RECON.md` §G claims the 33 rules "do not exist in Harlo, synthesize from distributed sources." That's wrong — rules existed in `Harlo/CLAUDE.md` lines 37–194 the whole time. My grep flagged the file but I didn't read in. Session 01.5 extracted from there directly; no synthesis was needed.
+Session 01 `docs/SESSION_01_RECON.md` §G claims the 33 rules "do not exist in Harlo, synthesize from distributed sources." Still wrong — rules existed in `Harlo/CLAUDE.md` lines 37–194 the whole time. Session 01.5 extracted directly; no synthesis was needed.
 
-Ask Joe at session start: fix `docs/SESSION_01_RECON.md` §G with a correction note (one short paragraph), or leave it as a session-stamped historical artifact?
+Joe's call at Session 03 start: fix §G with a correction note (one short paragraph), or leave as a session-stamped historical artifact?
