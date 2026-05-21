@@ -51,6 +51,37 @@ If a single Hanna file requires tests that *also* touch a Harlo-cloned subsystem
 
 ---
 
+## 2. Fresh-seed vs. clone state — attribution trailer timing
+
+**Resolution of:** [D004](DECISIONS.md) Clause B.
+**Status:** Resolved 2026-05-20.
+
+### The rule
+
+A Hanna source file's attribution-trailer requirement depends on whether the *content* descends from Harlo, not on the file's path:
+
+- **Pure clone** (file's content is derived from a Harlo original, even if structurally adapted): carries the trailer from creation. Examples: `src/harlo_bridge.py`, `src/computations/compute_producer_phase.py` (per [D003](DECISIONS.md)).
+- **Fresh seed** (file's content is authored in Hanna with no Harlo ancestor): carries no trailer. Examples: today's `src/schemas.py` (Session 02 minimal seed per `NEXT.md` option (b)); all `tests/**` mirror-tree test files.
+- **Fresh-seed-becoming-partial-clone** (file starts fresh but will absorb cloned Harlo content in a later session): the trailer is added **at clone-time, not seed-time** — the session that first lands cloned Harlo content into the file adds the trailer in the same commit.
+
+### The canonical case
+
+`src/schemas.py` was created in Session 02 as a fresh seed with only `ProducerPhase` (per `NEXT.md` option (b)). It is expected to grow as later sessions clone Harlo schemas in. Until that first clone-bearing commit, `schemas.py` carries no trailer. The session that lands the first cloned schema:
+
+1. Adds the trailer as the file's first comment line, immediately above the module docstring.
+2. Updates the module docstring to reflect the cloned content.
+3. Commits trailer addition + cloned content in a single commit.
+
+### Reasoning
+
+[D003](DECISIONS.md) made the trailer the only required per-file marker for cloned files. The boundary case — files whose Harlo-derivation status changes over time — needed an explicit rule so the reviewer ([D004](DECISIONS.md) Clause A) has an unambiguous audit surface and future sessions don't relitigate. Anchoring the trailer to clone-time (not file-creation-time) matches the trailer's semantic purpose: it marks a file as carrying Harlo-derived content. A file with no Harlo content has nothing to attribute.
+
+### Open question parked
+
+If a file is later refactored such that all Harlo-derived content is replaced by fresh Hanna authoring, does the trailer come off? Surfaced for revisit if it ever happens; default is **keep the trailer** — the file's lineage doesn't change just because all the original lines did.
+
+---
+
 ## End of CONVENTIONS.md
 
 Conventions accrete as sessions resolve open questions. Every entry must cite the session that resolved it and the date.

@@ -208,6 +208,44 @@ This reconciliation follows the same pattern as D001 (Rule 35): an existing arti
 
 ---
 
+### D004 — Attribution-trailer hygiene at reviewer and conventions layers
+
+**Status:** resolved
+**Date:** 2026-05-20
+**Ratified by:** Joe (Joseph Ibrahim)
+**Scope:** D002 compliance-reviewer checklist; [`docs/CONVENTIONS.md`](CONVENTIONS.md) §-note on fresh-seed vs. clone state.
+
+**Decision.** D003 made the attribution trailer the only required per-file marker for cloned files. D004 installs the operational guardrails so the rule actually holds across future sessions.
+
+**Clause A — Reviewer checklist amendment.** The D002 compliance reviewer expert's checklist gains one mandatory item:
+
+> Every file in `src/**`, `python/hanna/**`, or `scripts/**` that descends from a Harlo source must carry the attribution trailer `# Cloned from Harlo (github.com/JosephOIbrahim/Harlo). Specialized for Hanna.` within its first 20 lines. Files with no Harlo ancestor must not carry the trailer. The reviewer FAILs the pass if either condition is violated.
+
+The 20-line bound is generous on purpose — it tolerates a multi-line provenance comment block before the trailer without forcing strict line-1 placement.
+
+**Clause B — CONVENTIONS pointer.** [`docs/CONVENTIONS.md`](CONVENTIONS.md) gains §2 ("Fresh-seed vs. clone state") pinning the rule for files that are *partially* clones — files born as fresh Hanna seeds today but expected to absorb Harlo content in a future session. [`src/schemas.py`](../src/schemas.py) is the canonical case (Session 02 minimal seed; later sessions clone Harlo schemas in). The §-note resolves the ambiguity: **the trailer is added at clone-time, not seed-time** — the session that first lands cloned Harlo content into the file adds the trailer in the same commit.
+
+**Reasoning.** D003 establishes the marker rule; D004 makes it auditable and forward-compatible. Without Clause A, the reviewer has no enforcement surface and discipline drifts as the codebase grows. Without Clause B, the boundary case (fresh today, clone-bearing tomorrow) has no canonical answer and each session has to relitigate. Both clauses are small and orthogonal — bundling them in one decision keeps the D-series readable and ensures the operational layers (reviewer prompt + conventions doc) ship together.
+
+The "20 lines" bound was chosen empirically: D003's amended files place the trailer at line 1 or 15. 20 accommodates a future clone that preserves a multi-line top-of-file Harlo comment before adding the trailer. Tighter bounds force trailer-placement battles for no audit benefit.
+
+**Implications.**
+
+- D002's reviewer-expert prompt template gains the Clause A check. Next MoE dispatch picks it up automatically.
+- [`docs/CONVENTIONS.md`](CONVENTIONS.md) gains §2 from Clause B in the same commit.
+- [`src/schemas.py`](../src/schemas.py) stays as-is (no trailer) until a future session lands cloned Harlo schema content. Trailer added in that same commit per Clause B.
+- Reviewer FAIL gate is non-skippable per D002 §"Review."
+- No code changes for existing files — Session 02's D003 amendments already satisfy the rule.
+
+**Related.**
+
+- D002 — reviewer-checklist surface this amendment lives on.
+- D003 — established the trailer rule this decision operationalizes.
+- [`docs/CONVENTIONS.md`](CONVENTIONS.md) — destination of the Clause B §-note.
+- `NEXT.md` will flag this for the session that next touches [`src/schemas.py`](../src/schemas.py).
+
+---
+
 ## End of decisions log
 
-Next decision number: **D004**.
+Next decision number: **D005**.
