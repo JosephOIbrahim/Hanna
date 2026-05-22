@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
@@ -132,6 +133,28 @@ last_review_iso: 2026-05-22
         assert pf.approaching[0].date_iso == ""
         assert "naked description" in pf.approaching[0].description
 
+    def test_parse_forcing_function_with_iso_datetime(self):
+        text = """---
+product: harlo
+status: in_flight
+last_review_iso: 2026-05-22
+---
+
+## Approaching forcing functions
+
+- 2026-06-01T10:30:00-04:00: launch window
+- 2026-06-15: simpler date
+"""
+        pf = ProductFile.parse(text)
+        assert len(pf.approaching) == 2
+        # ISO datetime with `:` characters in the time portion is preserved
+        # by splitting on `: ` (canonical delimiter), not on first `:`.
+        assert pf.approaching[0].date_iso == "2026-06-01T10:30:00-04:00"
+        assert pf.approaching[0].description == "launch window"
+        # Legacy YYYY-MM-DD case still works.
+        assert pf.approaching[1].date_iso == "2026-06-15"
+        assert pf.approaching[1].description == "simpler date"
+
 
 class TestProductStatus:
     def test_in_flight_value(self):
@@ -181,5 +204,5 @@ class TestBriefPayload:
             composed_at_iso="2026-05-22T18:00:00-04:00",
             body_markdown="evening body",
         )
-        with pytest.raises(Exception):
+        with pytest.raises(FrozenInstanceError):
             payload.body_markdown = "mutated"  # type: ignore[misc]

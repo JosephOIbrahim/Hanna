@@ -67,6 +67,8 @@ class HarloBridge:
         self._stderr_ring: collections.deque[str] = collections.deque(maxlen=64)
         self._drainer_thread: threading.Thread | None = None
         self._drainer_stop = threading.Event()
+        # Trailing bytes from the previous frame read (D005.2 — frame coalescing).
+        self._recv_buffer: bytearray = bytearray()
 
     # --- lifecycle ----------------------------------------------------
 
@@ -94,6 +96,7 @@ class HarloBridge:
                 self._drainer_thread.join(timeout=2.0)
             self._drainer_thread = None
             self._proc = None
+            self._recv_buffer.clear()
 
     # --- composition scope (D005.1) -----------------------------------
 
@@ -268,15 +271,14 @@ class HarloBridge:
         except (BrokenPipeError, OSError) as e:
             raise HarloUnreachable(f"failed to write frame to Harlo: {e}") from e
 
-    @staticmethod
-    def _read_frame(proc: subprocess.Popen[bytes], timeout: float | None = None) -> dict:
+    def _read_frame(self, proc: subprocess.Popen[bytes], timeout: float | None = None) -> dict:
         if proc.stdout is None:
             raise HarloUnreachable("Harlo subprocess has no stdout")
         # MCP stdio uses Content-Length-prefixed JSON frames (LSP-style).
         if timeout is None:
             # Legacy blocking path — preserved for callers passing None.
             return HarloBridge._read_frame_blocking(proc)
-        return HarloBridge._read_frame_with_timeout(proc, timeout)
+        return self._read_frame_with_timeout(proc, timeout)
 
     @staticmethod
     def _read_frame_blocking(proc: subprocess.Popen[bytes]) -> dict:
@@ -304,8 +306,7 @@ class HarloBridge:
         except json.JSONDecodeError as e:
             raise HarloProtocolError(f"malformed JSON frame: {e}") from e
 
-    @staticmethod
-    def _read_frame_with_timeout(proc: subprocess.Popen[bytes], timeout: float) -> dict:
+    def _read_frame_with_timeout(self, proc: subprocess.Popen[bytes], timeout: float) -> dict:
         assert proc.stdout is not None
         deadline = time.monotonic() + timeout
         sel = selectors.DefaultSelector()
@@ -315,9 +316,13 @@ class HarloBridge:
             raise HarloUnreachable(f"Harlo stdout has no usable fd: {e}") from e
         sel.register(proc.stdout, selectors.EVENT_READ)
         try:
-            buf = bytearray()
+            # Seed buf with any bytes left over from the previous frame read so
+            # frame coalescing (two frames in one TCP write) doesn't drop the
+            # tail of the previous read.
+            buf = bytearray(self._recv_buffer)
+            self._recv_buffer.clear()
             content_length: int | None = None
-            header_end = -1
+            header_end = buf.find(b"\r\n\r\n")
             # Phase 1: read until the header block separator appears.
             while header_end < 0:
                 remaining = deadline - time.monotonic()
@@ -345,9 +350,13 @@ class HarloBridge:
                         raise HarloProtocolError(f"bad Content-Length header: {line!r}") from e
             if content_length is None:
                 raise HarloProtocolError("frame missing Content-Length header")
-            # Phase 3: read body bytes — buf may already contain part of it.
+            # Phase 3: take only this frame's body from buf; save trailing
+            # bytes (e.g. start of the next frame) into the recv buffer for
+            # the next _read_frame_with_timeout call.
             body_start = header_end + 4
-            body = bytearray(buf[body_start:])
+            body = bytearray(buf[body_start:body_start + content_length])
+            if len(buf) > body_start + content_length:
+                self._recv_buffer.extend(buf[body_start + content_length:])
             while len(body) < content_length:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:

@@ -143,7 +143,7 @@ flowchart TB
 
 Hanna inherits Harlo's substrate verbatim, including the **33 inviolable rules** (biological constraints, elenchus constraints, inquiry safeguards, motor cortex constraints) and **8 inquiry safeguards**. Producer-specific addenda extend the set:
 
-- **Rule 34** — Family-first lockout at three layers (above).
+- **Rule 34** — Family-first lockout at two active layers (Layer 2 Cut per [D008.1](docs/DECISIONS.md); see above).
 - **Rule 35** — Cross-substrate writes prohibited. Harlo edge is read-only; Octavius edge is request-only.
 - **Rule 36** — Surface, do not decide. Every output is framed as a surfaced decision.
 - **Rule 37** — Hard subject-matter prohibitions. See [`RULES.md`](RULES.md).

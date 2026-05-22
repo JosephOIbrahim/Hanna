@@ -116,8 +116,14 @@ def _parse_bullets(body_lines: list[str]) -> list[str]:
 
 
 def _parse_forcing_function(bullet: str) -> ForcingFunction:
-    if ":" in bullet:
-        date_part, _, description = bullet.partition(":")
+    # ISO datetimes contain `:` (e.g. `2026-06-01T10:30:00-04:00`); split on
+    # the canonical `: ` delimiter first to preserve them. Fall back to a
+    # single `:` only when no space follows (legacy/simple `YYYY-MM-DD:desc`).
+    if ": " in bullet:
+        date_part, description = bullet.split(": ", 1)
+        return ForcingFunction(date_iso=date_part.strip(), description=description.strip())
+    if bullet.count(":") == 1:
+        date_part, description = bullet.split(":", 1)
         return ForcingFunction(date_iso=date_part.strip(), description=description.strip())
     return ForcingFunction(date_iso="", description=bullet.strip())
 

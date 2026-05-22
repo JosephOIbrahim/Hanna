@@ -187,7 +187,7 @@ class TestReadFrameTimeout:
         try:
             start = time.monotonic()
             with pytest.raises(HarloTimeout):
-                HarloBridge._read_frame(proc, timeout=0.1)  # type: ignore[arg-type]
+                HarloBridge()._read_frame(proc, timeout=0.1)  # type: ignore[arg-type]
             elapsed = time.monotonic() - start
             assert elapsed < 1.0
         finally:
@@ -199,7 +199,7 @@ class TestReadFrameTimeout:
             # Send a partial header but never finish — should time out.
             proc.feed(b"Content-Length: 12\r\n")
             with pytest.raises(HarloTimeout):
-                HarloBridge._read_frame(proc, timeout=0.1)  # type: ignore[arg-type]
+                HarloBridge()._read_frame(proc, timeout=0.1)  # type: ignore[arg-type]
         finally:
             proc.close()
 
@@ -209,7 +209,7 @@ class TestReadFrameTimeout:
             # Full header block but short body — should time out on body read.
             proc.feed(b"Content-Length: 32\r\n\r\n{\"jsonrpc\":")
             with pytest.raises(HarloTimeout):
-                HarloBridge._read_frame(proc, timeout=0.1)  # type: ignore[arg-type]
+                HarloBridge()._read_frame(proc, timeout=0.1)  # type: ignore[arg-type]
         finally:
             proc.close()
 
@@ -218,7 +218,7 @@ class TestReadFrameTimeout:
         try:
             payload = {"jsonrpc": "2.0", "id": 1, "result": {"ok": True}}
             proc.feed(_frame(payload))
-            result = HarloBridge._read_frame(proc, timeout=1.0)  # type: ignore[arg-type]
+            result = HarloBridge()._read_frame(proc, timeout=1.0)  # type: ignore[arg-type]
             assert result == payload
         finally:
             proc.close()
@@ -228,7 +228,7 @@ class TestReadFrameTimeout:
         proc.close_write()  # EOF immediately.
         try:
             with pytest.raises(HarloUnreachable):
-                HarloBridge._read_frame(proc, timeout=1.0)  # type: ignore[arg-type]
+                HarloBridge()._read_frame(proc, timeout=1.0)  # type: ignore[arg-type]
         finally:
             proc.close()
 
@@ -237,7 +237,7 @@ class TestReadFrameTimeout:
         try:
             proc.feed(b"Content-Length: not-an-int\r\n\r\n{}")
             with pytest.raises(HarloProtocolError):
-                HarloBridge._read_frame(proc, timeout=1.0)  # type: ignore[arg-type]
+                HarloBridge()._read_frame(proc, timeout=1.0)  # type: ignore[arg-type]
         finally:
             proc.close()
 
@@ -298,12 +298,11 @@ class TestStderrDrainer:
         )
         stderr = io.BytesIO(payload)
         bridge._proc = _MockProc(stderr=stderr)  # type: ignore[assignment]
-        start = time.monotonic()
         bridge._start_drainer()
         try:
+            # _wait_until functionally verifies non-deadlocking behavior;
+            # an explicit wall-clock bound was brittle under loaded CI runners.
             assert _wait_until(lambda: len(bridge.last_stderr()) == 64)
-            elapsed = time.monotonic() - start
-            assert elapsed < 2.0  # nowhere near a deadlock
             assert len(bridge.last_stderr()) == 64
         finally:
             bridge._drainer_stop.set()

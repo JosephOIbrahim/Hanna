@@ -3,7 +3,7 @@
 
 End-to-end: inline phase compute, one Harlo `coach` read via the bridge,
 one persisted SQLite row, one composed brief to stdout. State-blind on
-HarloUnreachable. No-op on FAMILY_LOCKOUT.
+HarloUnreachable or HarloTimeout. No-op on FAMILY_LOCKOUT.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 from src.computations.compute_brief_priority import compute_brief_priority
 from src.computations.compute_producer_phase import compute_producer_phase
-from src.harlo_bridge import HarloBridge, HarloUnreachable
+from src.harlo_bridge import HarloBridge, HarloTimeout, HarloUnreachable
 from src.schemas import BriefPayload, ProducerPhase, ProductFile, ProductStatus
 
 _STATUS_DISPLAY_ORDER = {
@@ -54,7 +54,7 @@ def _read_harlo() -> tuple[bool, dict | None]:
     try:
         with HarloBridge() as bridge:
             return True, bridge.drive_coaching_exchange()
-    except HarloUnreachable:
+    except (HarloUnreachable, HarloTimeout):
         return False, None
 
 
