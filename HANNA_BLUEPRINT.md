@@ -107,22 +107,22 @@ After the initial clone commit, the two repos do not share git history.
 
 ## 4. Substrate inheritance
 
-What carries from Harlo. **Audit 2026-05-20:** added Audit Status per item. Items marked Cut or Review require Joe's ratification before removal — until then, the v0.1.0 clone posture stands.
+What carries from Harlo. **Audit 2026-05-20** added per-item status; **D008 2026-05-22** ratified each item whole-batch. The table below reflects the ratified state.
 
-| Component | v0.1.0 plan | Audit status | Rationale |
+| Component | v0.1.0 plan | Decision (D008) | Rationale |
 |---|---|---|---|
 | Pure-function computation pattern (`src/computations/*.py`) | Pattern + scaffolding cloned | **Keep — load-bearing** | Structurally enforces Rule 36 ("surface, don't decide") — pure enum returns cannot side-effect. The one inheritance that earns its keep at all costs. |
 | FastMCP server + structured-JSON tool returns | Module structure cloned, renamed `hanna/mcp_server.py` | **Keep** | The tool-call substrate is real. Renaming holds. |
 | RED-state override (Rule 18) routed via Harlo bridge | Verbatim | **Keep** | Rule 18 actually lives here; the override is non-negotiable. |
 | Test discipline (pytest, mirror tree) | Verbatim | **Keep** | Biological-fidelity gates apply selectively — only where the function shape matches. |
-| Apache 2.0 headers and `NOTICE` | Updated for Hanna attribution | **Keep** | Already shipped. |
-| Hydra delegate pattern (`src/delegate_*.py`) | Pattern + base class cloned | **Cut (pending ratification)** | Designed for routing tasks across model backends with capability negotiation. Hanna calls Claude. One backend = indirection in search of a purpose; the delegate adds a layer that has to be threaded through every MCP tool to satisfy Rule 34's "second layer." |
-| USD stage architecture | Verbatim | **Cut (pending ratification)** | USD is a stage-composition language for film pipelines. Hanna's corpus is ~10 briefs/week × ~2KB. SQLite + JSON dominates on every axis at this volume. Using USD to time-sample "did we ship the morning brief" is a category error. |
-| Hot tier (FTS5) / warm tier (SDR) / cold tier (USD) | Verbatim | **Cut (pending ratification)** | Three-tier storage sized for sub-2ms cognitive recall under continuous load. Hanna's latency budget is "before coffee gets cold." One SQLite file per table is the whole job. |
-| Rust hot path via PyO3 | Inherited via cloned crates | **Cut (pending ratification)** | No hot path exists. Hanna runs six events/day on a wall clock. Python loop is faster to write, debug, and reason about. |
-| XGBoost predictor harness | Verbatim. Retrained on producer signals. | **Cut (pending ratification)** | Cold-start bootstrap admits no training data exists and won't for months. A hand-coded heuristic ("deadline within 5 working days × in-flight product count") outperforms an undertrained model and ships in 30 minutes. |
-| Dual venv (3.12 USD / 3.14 project) | Verbatim | **Cut (pending ratification)** | Falls out automatically once USD is cut. Build-system tax with no payoff. |
-| The 33 inviolable rules | **Inherited.** Producer addenda 34–37 added in Session 01.5. | **Review** | Rules 34–37 (producer addenda) are Hanna's own and stay. Rules 1–8, 11–17, 19–33 are guardrails for code that doesn't exist in Hanna (hippocampal mutation, motor reflex compilation, inquiry verification). Their compliance greps in `RULES.md` pass trivially because the constrained code isn't there — that's a green CI light meaning nothing, not safety. Selectively re-adopt rules as the underlying components actually land. Rule 18 (RED override) is the exception and stays now. |
+| Apache 2.0 headers and `NOTICE` | ~~Updated for Hanna attribution~~ Reversed by D003: no per-file headers. | **Reversed (D003)** | D003 ratified the literal reading of `NOTICE` — Harlo carries zero per-file headers; the clone inherits the absence. One-line attribution trailer at the top of each cloned file. |
+| Hydra delegate pattern (`src/delegate_*.py`) | Pattern + base class cloned | **Cut (D008.1)** | Designed for routing tasks across model backends with capability negotiation. Hanna calls Claude. One backend = indirection in search of a purpose. Rule 34's "second layer" collapses into per-tool lockout checks (layer 3); no `HdProducer` file ever ships. |
+| USD stage architecture | Verbatim | **Cut (D008.2)** | USD is a stage-composition language for film pipelines. Hanna's corpus is ~10 briefs/week × ~2KB. SQLite + JSON dominates on every axis. D006's Calendar choice corroborates: Calendar IS the stage for v1. |
+| Hot tier (FTS5) / warm tier (SDR) / cold tier (USD) | Verbatim | **Cut (D008.3)** | Three-tier storage sized for sub-2ms cognitive recall under continuous load. Hanna's latency budget is "before coffee gets cold." One SQLite file per logical table (briefs, capsules, snapshots) is the whole job. |
+| Rust hot path via PyO3 | Inherited via cloned crates | **Cut (D008.4)** | No hot path exists. Hanna runs six events/day on a wall clock. Cloned crates removed from the lane diagram. |
+| XGBoost predictor harness | Verbatim. Retrained on producer signals. | **Cut (D008.5)** | Harlo's predictor is currently inactive per SPIKE_HARLO_EDGE_2026-05-20 §4 — nothing live to bootstrap from. A hand-coded heuristic outperforms an undertrained model and ships in 30 minutes. `compute_brief_priority` (L4a) replaces. |
+| Dual venv (3.12 USD / 3.14 project) | Verbatim | **Cut (D008.6)** | Falls out automatically once D008.2 USD is cut. Single-venv posture ratified by docs/REVIEW_2026-05-22.md Action 2 + the L2 substrate-hygiene lane. |
+| The 33 inviolable rules | **Inherited.** Producer addenda 34–37 added in Session 01.5. | **Review with selective re-adoption (D008.7)** | Rules 34–37 (producer addenda) are Hanna's own and stay. Rules 1–8, 11–17, 19–33 are guardrails for code that doesn't exist in Hanna; non-active rules are annotated as "Not yet load-bearing — applies on the session that lands the constrained component" per RULES.md applicability note + §13 convention. Rule 18 (RED override) is active now via the Harlo bridge's `read_burnout_level`. |
 
 ---
 
@@ -139,16 +139,11 @@ Clone the existing pattern from `src/computations/compute_burst.py` and `compute
 - `compute_forcing_function.py` — which deadlines are advancing into a critical window.
 - `compute_formation_readiness.py` — whether to spawn an Octavius formation now or queue it.
 
-### New Hydra delegate
+### ~~New Hydra delegate~~ — **Cut per D008.1 (2026-05-22)**
 
-Clone `src/delegate_claude.py`. New file: `src/delegate_producer.py`.
+> ~~Clone `src/delegate_claude.py`. New file: `src/delegate_producer.py`. Class: `HdProducer`, `supported_tasks = ["synthesis", "coordination", "producer"]`, `latency_max = "interactive"`, `context_budget = "medium"`. Inherits Harlo's RED-state override pattern. Adds `FAMILY_LOCKOUT` as a second override (see §7).~~
 
-- Class: `HdProducer`
-- `supported_tasks = ["synthesis", "coordination", "producer"]`
-- `latency_max = "interactive"`
-- `context_budget = "medium"`
-
-Inherits Harlo's RED-state override pattern. Adds `FAMILY_LOCKOUT` as a second override (see §7).
+D008.1 ratified Cut. Hanna calls Claude (one backend) so the routing-across-backends purpose of the delegate disappears. Rule 34's "second layer" collapses into per-tool lockout checks (layer 3) in the `mcp_tools` lane.
 
 ### New MCP tools
 
@@ -169,23 +164,17 @@ hanna_status                  (own-stage health)
 
 Every tool checks lockout state before executing. Lockout returns a structured `LockoutResponse`, not an error.
 
-### New stage prims
+### ~~New stage prims~~ — **Cut per D008.2 + D008.3 (2026-05-22)**
 
-Hanna authors to its own stage, in the `/hanna/*` namespace. It never authors to Harlo's stage.
+> ~~Hanna authors to its own stage, in the `/hanna/*` namespace. USD prim paths: `/hanna/daily/{brief,midday_check,capsule}`, `/hanna/weekly/{30k_monday,harvest_friday}`, `/hanna/monthly/50k_review`, `/hanna/forcing_functions`, `/hanna/formations/{active,history}`, `/hanna/products/{name}`, `/hanna/joe_state_snapshot`.~~
 
-```
-/hanna/daily/brief
-/hanna/daily/midday_check
-/hanna/daily/capsule
-/hanna/weekly/30k_monday
-/hanna/weekly/harvest_friday
-/hanna/monthly/50k_review
-/hanna/forcing_functions
-/hanna/formations/active
-/hanna/formations/history
-/hanna/products/{harlo, octavius, moneta, comfy_cozy, ...}
-/hanna/joe_state_snapshot     (cached read from Harlo, with TTL)
-```
+D008.2 ratified Cut on USD stage; D008.3 ratified Cut on three-tier storage. Hanna's persistence is SQLite-only (per L2's substrate-hygiene posture). The functional shape that USD prims served lands as SQLite tables:
+
+- briefs (already at PoC level in `data/hanna.sqlite`, ratified by L4a's BriefPayload schema)
+- capsules, formations, products (each one SQLite table; schemas land in L5)
+- joe_state_snapshot (a single-row table or in-memory cache — L4a or L6 decides)
+
+D006's Calendar choice corroborates the Cut: Calendar IS the stage for v1 (event-as-prim). Persistent state lives in SQLite, observable via the calendar.
 
 ### New bridge modules
 
@@ -301,25 +290,29 @@ The reconciled contract:
 
 Hanna is built in lanes. Lanes may be parallelized across Code sessions after the recon and scaffold phases complete.
 
+**Audit 2026-05-20 + D008 2026-05-22 refresh.** `delegate` and `stage` lanes are Cut. `stage` reduces to SQLite tables in `data/hanna.sqlite` (no `/hanna/*` USD prim authoring). The active lane set:
+
 | Lane | Owns | Depends on |
 |---|---|---|
 | `recon` | Reading existing patterns, producing observation doc | Nothing |
 | `computations` | `compute_producer_phase`, `compute_brief_priority`, `compute_forcing_function`, `compute_formation_readiness` | `recon` |
-| `delegate` | `HdProducer` class | `recon`, `computations` |
 | `harlo_bridge` | Read-only MCP client to Harlo | `recon` |
 | `octavius_bridge` | Formation spawn via subprocess + MCP | `recon` |
-| `mcp_tools` | All `hanna_*` MCP tools and their lockout gating | `computations`, `delegate`, both bridges |
-| `stage` | `/hanna/*` prim authoring, time-sampling | `recon` |
+| `mcp_tools` | All `hanna_*` MCP tools and their lockout gating (Rule 34 layer 3 — collapsed from layer 2 + 3 per D008.1) | `computations`, both bridges |
+| `persistence` | SQLite tables in `data/hanna.sqlite` for briefs, capsules, formations, products, joe_state_snapshot. Replaces the cut `stage` lane (D008.2/D008.3). | `computations` |
+| `channels` | `src/channels/calendar.py` — D006 Calendar event publishing | `computations`, `mcp_tools` |
 | `tests` | Cross-lane integration tests, biological-fidelity gates | All implementation lanes |
 | `day_zero` | `scripts/first_hanna_brief.py` end-to-end | All other lanes |
 
-Build order (v0.1.0): `recon` → scaffold all lanes → fill `computations` + `harlo_bridge` in parallel → fill `delegate` → fill `mcp_tools` → fill `octavius_bridge` → fill `stage` → integrate → `day_zero`.
+**Cut lanes (D008):** `delegate` (D008.1), `stage` USD-prim-authoring (D008.2/3), Rust hot path (D008.4), XGBoost predictor harness (D008.5), dual venv (D008.6). None of these were built; ratification formalizes their absence from the diagram.
 
-**Audit 2026-05-20 — revised build order.** The v0.1.0 order treats the Harlo edge as just one lane among several, but every downstream lane depends on the Harlo contract being real. Revised order, leading with verification:
+**Revised build order (post-audit + post-D008):**
 
-1. **`harlo_edge_spike`** *(new, ~30 min)* — call Harlo's actual MCP tools (`coach`, `status`, `recall`) and confirm whether the v0.1.0 `read_state`/`read_prediction`/`read_burnout_level` contract is achievable. Output: a one-page note in `docs/` that either confirms the contract, redefines it as a composition, or escalates a blueprint change. *Until this completes, every other lane is speculative.*
-2. **`first_brief_poc`** *(new, ~1 session)* — the smaller day-zero per §11. Inline lockout, real Harlo tool call, one stage prim (or SQLite row if §4 USD status resolves Cut), composed brief printed to stdout. Touches every contract end-to-end in ~80 lines. *Validates the architecture before the lanes refactor it.*
-3. `recon` ✓ (shipped) → `rules` ✓ (shipped) → `web` ✓ (Phase-1 reference shipped) → `computations` → `harlo_bridge` *(refactor the spike into a proper module)* → `delegate` *(only if §4 Hydra status resolves Keep)* → `mcp_tools` → `octavius_bridge` → `stage` *(only if §4 USD status resolves Keep)* → `day_zero` long-form.
+1. **`harlo_edge_spike`** ✓ (shipped 2026-05-20; full findings at `docs/SPIKE_HARLO_EDGE_2026-05-20.md`).
+2. **`first_brief_poc`** ✓ (shipped; `scripts/first_hanna_brief.py` runs end-to-end; Rule 34 layer 1 lands per commit `3cdd516`).
+3. `recon` ✓ → `rules` ✓ → `web` ✓ (Phase-1 reference shipped) → `computations` *(Session 03 fills the six non-lockout branches per L3a)* → `harlo_bridge` *(hardening per L3b — D005)* → `persistence` *(inline at the PoC level; promoted to its own lane in L4a/L5)* → `channels` *(L4b — `src/channels/calendar.py` for D006)* → `mcp_tools` *(L6 — `python/hanna/mcp_server.py`)* → `octavius_bridge` *(L7)* → `day_zero` long-form *(post-L6)*.
+
+Lane execution is now governed by `docs/ROADMAP.md` §5's status table; the `/hanna-dispatch-next` harness advances one lane per invocation.
 
 Multi-agent parallelism flips on when three conditions hold *simultaneously*: (a) the Harlo edge is verified end-to-end (not assumed), (b) the brief-write path is exercised once with a real persisted artifact, (c) at least two lanes share no dependency edge in the *live* code (not just on the lane diagram). Before that, parallelism is three agents stubbing against the same unverified contract. **Start single-agent. Promote to multi-agent only after `first_brief_poc` runs green.**
 

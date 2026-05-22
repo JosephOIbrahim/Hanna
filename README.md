@@ -101,7 +101,7 @@ Override exists for true exceptions — explicit `override_token`, HMAC-signed, 
 
 ## Build lanes
 
-Hanna is built in lanes. Lanes may be parallelized across sessions after recon and scaffold complete. **Yellow = landed. Orange = in flight or scheduled.**
+Hanna is built in lanes. Lanes may be parallelized across sessions after recon and scaffold complete. **Yellow = landed. Orange = in flight or scheduled.** Lane execution is governed by [`docs/ROADMAP.md`](docs/ROADMAP.md) §5; the [`/hanna-dispatch-next`](.claude/commands/hanna-dispatch-next.md) harness advances one lane per invocation. `delegate` and `stage` lanes are Cut per [D008](docs/DECISIONS.md) (delegate collapsed into `mcp_tools` layer 3; stage reduced to SQLite tables).
 
 ```mermaid
 flowchart TB
@@ -113,10 +113,10 @@ flowchart TB
     UI["web<br/>Phase-1 design reference"]:::done
     Comp["computations<br/>4 pure functions"]:::next
     HB["harlo_bridge<br/>read-only MCP client"]:::next
-    Del["delegate<br/>HdProducer"]:::next
     OB["octavius_bridge<br/>subprocess + MCP-over-stdio"]:::next
-    MCPt["mcp_tools<br/>hanna_* surface"]:::next
-    Stage["stage<br/>/hanna/* prim authoring"]:::next
+    MCPt["mcp_tools<br/>hanna_* surface<br/>(Rule 34 layer 3)"]:::next
+    Persist["persistence<br/>SQLite tables<br/>(replaces stage per D008.2/3)"]:::next
+    Channels["channels<br/>calendar.py (D006)"]:::next
     Day0["day_zero<br/>scripts/first_hanna_brief.py"]:::next
 
     Recon --> Rules
@@ -124,13 +124,15 @@ flowchart TB
     Rules --> Comp
     Rules --> HB
     Rules --> OB
-    Comp  --> Del
-    Del   --> MCPt
+    Comp  --> Persist
+    Comp  --> MCPt
     HB    --> MCPt
     OB    --> MCPt
-    MCPt  --> Stage
-    Stage --> Day0
-    UI    -.->|"surface for"| MCPt
+    Comp  --> Channels
+    MCPt  --> Channels
+    Persist --> Day0
+    Channels --> Day0
+    UI    -.->|"design reference for"| Channels
 ```
 
 **Day-zero deliverable:** `scripts/first_hanna_brief.py` boots Hanna, reads Joe's state from Harlo, computes producer phase, ranks brief priority across portfolio products, authors `/hanna/daily/brief` to stage, and returns the brief to stdout. *If that script runs, Hanna is real. The rest is iteration.*

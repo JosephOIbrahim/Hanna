@@ -286,7 +286,7 @@ This is the single source of truth the `/hanna-dispatch-next` slash command read
 
 | Lane | Status | Last commit | Unblocks |
 |---|---|---|---|
-| L1 — D008 propagation | queued | — | L2 |
+| L1 — D008 propagation | **done** | `docs(blueprint): propagate D008 ratification (L1)` (this commit; see `git log --grep "L1"`) | L2 |
 | L2 — Substrate hygiene | queued | — | L3a, L3b |
 | L3a — Session 03 phase bodies | queued | — | L4a |
 | L3b — D005 bridge hardening | queued | — | L4b |
