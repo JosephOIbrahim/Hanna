@@ -1,5 +1,19 @@
 # NEXT — for tomorrow-you
 
+## 2026-05-22 session outcome
+
+Three commits landed on `claude/hanna-mcp-review-ZsorY`:
+
+- `3cdd516` — Rule 34 layer 1 lands (FAMILY_LOCKOUT enum return; ET tz contract; PoC SSOT consumer; bridge `with`-block).
+- `5acd00a` — D005 drafted (open) bundling three bridge-hardening sub-decisions.
+- `7d74337` — first-principles review at `docs/REVIEW_2026-05-22.md` (405 lines).
+
+Plus, this commit lands:
+
+- **D006 — RESOLVED.** Delivery channel for v1 briefs = dedicated `Hanna` iCloud calendar with 0-minute anchor events at rhythm times, brief body in event notes. Full reasoning at [`docs/DECISIONS.md`](docs/DECISIONS.md) D006. The 3-day behavioral test in the §12.6 default was skipped; first-principles reasoning is the substitute. Implementation lane: a future MoE dispatch at `src/channels/calendar.py` (Bridge Engineer + Brief Composer + Compliance Reviewer).
+
+D007 and D008 are drafted in the next commit.
+
 ## Where you are
 
 - Branch: `main` (HEAD = `4dcc36b`).

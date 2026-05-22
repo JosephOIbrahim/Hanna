@@ -297,6 +297,52 @@ The choice of `(a)` defaults across all three is guided by the same principle: p
 
 ---
 
+### D006 — Delivery channel: dedicated "Hanna" iCloud calendar with 0-minute anchor events
+
+**Status:** resolved
+**Date:** 2026-05-22
+**Ratified by:** Joe (Joseph Ibrahim)
+**Scope:** [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §12.6 (delivery channel for v1 briefs); §5 "Producer UI Surface" line 213 (channel-agnostic posture); [`README.md`](../README.md):7 (the "always-on" front-door claim); [`bin/hanna-brief.command`](../bin/hanna-brief.command) Phase-2 wiring; future `src/channels/calendar.py` module; the `mcp_tools` lane's tool-return shape; the brief composer voice calibration.
+
+**Decision.** Hanna's v1 brief delivery channel is **Calendar events on a dedicated "Hanna" iCloud calendar**. Every brief (morning, midday, evening, weekly_monday, weekly_friday, monthly) is authored as a 0-minute anchor event at the rhythm time, with the brief body in the event notes (markdown). The calendar is a dedicated iCloud calendar named **`Hanna`** that Joe can show/hide independently of his work calendar.
+
+This decision **skips the 3-day behavioral observation test proposed in the §12.6 default** (the audit's recommendation) in favor of first-principles reasoning. The reasoning is recorded below; the test option is preserved as a reversal-trigger if 30 days of behavioral data shows the choice was wrong (D006-reversal would be a new D-entry, not an amendment).
+
+**Reasoning.** The producer's job per [Rule 36](../RULES.md) / [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §1 is to *surface*, not to decide or push. Three constraints rank the candidate channels (iMessage via Shortcuts, macOS notification via `osascript`, Calendar event, browser — the original Phase-1 mockup target):
+
+1. **Non-interruption.** A producer that pushes contradicts "surface, don't decide." iMessage and macOS notification both push; both fail this constraint.
+2. **Cross-device.** Joe lives in Houdini and on iPhone (the [Audit Log](../HANNA_BLUEPRINT.md) finding #4 framing). The channel must follow Joe; macOS notification is Mac-only and fails.
+3. **Persistence.** Joe may re-read the morning brief at noon. macOS notification is transient (swipe = lost); browser requires Joe to remember a URL.
+
+Calendar event passes all three: iCloud syncs Mac ↔ iPhone ↔ Watch; events are visible in day-view without push; events persist for re-read. The dedicated `Hanna` calendar isolates Hanna's output from Joe's working calendar — show it when wanted, hide it without disturbance.
+
+Posture fit is the cleanest argument: a Calendar event reads as **"context the day carries."** Joe opening his calendar in the morning finds Hanna's note sitting in the day-view; this matches the surface-don't-decide posture more cleanly than any push-based channel.
+
+The audit's recommended 3-day test was the disciplined path. Skipping it is conscious; the first-principles reasoning above is the substitute. If behavioral data over the first 30 days of Calendar-channel operation shows Joe ignoring, hiding, or muting the calendar, this D006 can reverse via a new D-entry that opens the test originally proposed.
+
+**Implications.**
+
+- **Implementation lane.** A future session lands `src/channels/calendar.py` (the channel adapter). Initial implementation via `osascript Calendar` on macOS; CalDAV / EventKit cross-platform considered later. The module exposes `publish(brief: BriefPayload) -> CalendarEventId` and `archive(event_id: CalendarEventId) -> None`. MoE-eligible (Bridge Engineer + Brief Composer for posture calibration + Compliance Reviewer).
+- **`bin/hanna-brief.command`** Phase-2 swap target is no longer "open the static HTML mockup in a browser." It becomes either (a) trigger a calendar publish if the script is fired manually, or (b) be deleted entirely once the MCP-tool surface authors calendar events automatically. The launcher's Phase-1 mockup-opening behavior stays as design *reference*; the destination is the Calendar.
+- **`mcp_tools` lane** can now size tool returns to a calendar-event posture. The structured-JSON return shape includes a `CalendarEventId` for tools that publish events; lockout returns `LockoutResponse` (still spec-only per §C.4 / NEXT.md:61) without publishing.
+- **Brief composer voice** calibrates to a calendar-event-notes context: markdown-ish, concise, persistent (Joe re-reads at noon), no preamble that assumes an interactive session.
+- **Rule 34 enforcement.** Calendar events are NOT created during FAMILY_LOCKOUT (the publish call is gated by the per-tool lockout check per [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §7 layer 3). The `override_token` mechanism (still spec-only per RULES.md:185) governs exceptions.
+- **`README.md:7` "always-on" framing.** The framing is now operationalized: Hanna fires briefs on a wall-clock schedule that lands in Joe's calendar regardless of whether Joe is in a Claude session. The "always-on" claim becomes real once `src/channels/calendar.py` lands. The README sentence wants a small cosmetic update to name the channel (deferred to the documentation-hygiene pass per [`REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §3.3).
+- **§12.7 input surface (D007 drafted in the next commit) is orthogonal.** Per-product `.md` files remain the proposed input-surface MVS regardless of channel; D006 and D007 do not bind each other.
+- **§4 USD-stage Cut (D008 drafted in the next commit) is corroborated.** D006 chooses an OS-level surface (Calendar) over a Hanna-authored stage; this matches the audit's posture that USD as a stage-composition substrate is the wrong fit for Hanna's workload. Calendar IS the stage for v1.
+
+**Related.**
+- [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §12.6 — the audit-added open decision this entry resolves.
+- [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) Audit Log finding #4 — the "always-on producer contradicts MCP-tools-only" tension.
+- [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §5 "Producer UI Surface" line 213 — the channel-agnostic posture (restraint, no red, deliberate negative space, calm typography) inherits to Calendar.
+- [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §3.1 — the first-principles review that surfaced the resolution.
+- [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §5 — the prior D006 seed (status-open test plan) this decision overrides.
+- D001 — the bridge-side ratification; D006 is the channel-side ratification.
+- D002 — D006 is author-by-main-thread substrate work; the eventual `src/channels/calendar.py` implementation is MoE-eligible.
+- [`RULES.md`](../RULES.md) §34 (family-first lockout) and §36 (surface, don't decide) — the rules that justify the channel choice.
+
+---
+
 ## End of decisions log
 
-Next decision number: **D006**.
+Next decision number: **D007**.
