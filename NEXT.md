@@ -11,8 +11,22 @@ Three commits landed on `claude/hanna-mcp-review-ZsorY`:
 Plus, this commit lands:
 
 - **D006 — RESOLVED.** Delivery channel for v1 briefs = dedicated `Hanna` iCloud calendar with 0-minute anchor events at rhythm times, brief body in event notes. Full reasoning at [`docs/DECISIONS.md`](docs/DECISIONS.md) D006. The 3-day behavioral test in the §12.6 default was skipped; first-principles reasoning is the substitute. Implementation lane: a future MoE dispatch at `src/channels/calendar.py` (Bridge Engineer + Brief Composer + Compliance Reviewer).
+- **D007 — DRAFTED (open).** Input surface MVS = per-product `.md` files at `data/products/{name}.md`, YAML frontmatter + named sections. Initial set: `harlo`, `octavius`, `moneta`, `comfy_cozy`. Six open sub-decisions (D007.1–D007.6) on frontmatter format, status enum, empty-file handling, layer (b)/(c) follow-on, `.gitignore` posture. Awaits Joe's ratification.
+- **D008 — DRAFTED (open).** §4 inheritance ratification = Cut six pending items (Hydra delegate, USD stage, three-tier storage, Rust hot path, XGBoost, dual venv); Review the 33 rules (selective re-adoption as constrained components land). Seven open sub-decisions (D008.1–D008.7), per-item ratifiable. Awaits Joe's ratification.
 
-D007 and D008 are drafted in the next commit.
+D006's Calendar choice corroborates D008.2 (USD Cut): Calendar IS the stage for v1. D007's input surface and D006's output channel are symmetric — both decisions favor surfaces Joe already inhabits over Hanna-authored fresh substrate.
+
+**Substrate-decision tree at end of session:**
+- D001 (Rule 35 permissive) — resolved
+- D002 (MoE methodology) — resolved
+- D003 (Apache headers) — resolved
+- D004 (trailer hygiene) — resolved
+- D005 (bridge hardening — rate-limit + read timeout + stderr drain) — **open**
+- D006 (Calendar channel) — resolved
+- D007 (per-product `.md` input surface MVS) — **open**
+- D008 (§4 inheritance ratification, 7 sub-decisions) — **open**
+
+Three open decisions await ratification before further substrate work can proceed cleanly.
 
 ## Where you are
 

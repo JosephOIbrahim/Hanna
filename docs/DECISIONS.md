@@ -343,6 +343,134 @@ The audit's recommended 3-day test was the disciplined path. Skipping it is cons
 
 ---
 
+### D007 — Input surface MVS: per-product `.md` files
+
+**Status:** open
+**Date:** 2026-05-22 (draft)
+**Ratified by:** (pending — Joe; per-item ratifiable)
+**Scope:** [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §12.7 (audit-added input surface decision); §5.6 "Input surface" lines 196–203; the brief composer's source-of-state (currently fiction at `scripts/first_hanna_brief.py:95–104`); the future `mcp_tools` lane (`hanna_log` / `hanna_block` candidates).
+
+**Decision (open — drafts the surface, awaits ratification).** Hanna's input surface for v1 is **per-product markdown files at `data/products/{name}.md`**. One file per portfolio product. Joe edits the file directly when state changes. File mtime is the freshness signal. The brief composer reads the file set on each compose call and renders accordingly.
+
+**Reasoning.** Per [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §5.6, three candidate input layers were sketched:
+
+- (a) Per-product `.md` files — lowest implementation cost, zero external API surface, Joe edits in any editor.
+- (b) Calendar reads — Joe schedules in tools already used; Hanna reads dated events as forcing functions.
+- (c) Conversational MCP tools (`hanna_log` / `hanna_block` / `hanna_unblock`) — single-sentence-becomes-state from any Claude session.
+
+The audit's proposed default (BLUEPRINT:373) is (a) first, then (b), then (c). This entry ratifies **(a) as the MVS**. The other two layers are not foreclosed — they become add-ons once (a) is in production.
+
+(a) is chosen first because: implementation cost is `Path.read_text()`; dependency surface is zero (no external API); freshness signal (file mtime) is trivially readable; Joe's existing editor habit transfers directly; and per-product separation enforces a discipline ("which product is this about?") that conversational tools blur.
+
+The choice also harmonizes with [D006](#d006--delivery-channel-dedicated-hanna-icloud-calendar-with-0-minute-anchor-events) (Calendar channel resolved): both decisions favor surfaces Joe already inhabits over Hanna-authored fresh substrate. Calendar is the output where Hanna lives; `.md` files are the input where Joe lives. Each tool used in its grain.
+
+**Proposed shape (open for ratification).** Each product file follows a consistent structure:
+
+```markdown
+---
+product: harlo
+status: in_flight
+last_review_iso: 2026-05-22
+---
+
+## Status
+
+[1–3 sentences naming where the product currently is.]
+
+## Blockers
+
+- [Bullet list of blockers; empty means "no blockers."]
+
+## Approaching forcing functions
+
+- [Bullet list with dates; e.g., "2026-05-30: Q2 review presentation"]
+
+## Notes
+
+[Free-form. Anything Joe wants to surface to Hanna that doesn't fit above.]
+```
+
+The frontmatter is YAML-style; the body is plain markdown with named sections. The brief composer reads each file and renders selectively: `status` → state line; `blockers` → blockers line; `approaching forcing functions` → "approaching this week" line; `notes` → optional flavor.
+
+**Initial product set** (matches [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §5 line 186, expandable per session): `harlo`, `octavius`, `moneta`, `comfy_cozy`. The MVS ships with these four files at `data/products/{name}.md`, even if some are empty stubs — the directory and pattern are the deliverable, not the prose.
+
+**Open per-item questions (default named, ratify or revise).**
+
+- **D007.1 — Frontmatter format.** YAML-style (default), TOML, or no frontmatter (sections only). YAML matches the modern markdown convention; TOML is type-strict; no-frontmatter is plain. **Default: YAML.**
+- **D007.2 — `status` enum.** `{in_flight, parked, shipped, exploring}` (default), or freeform string. An enum disciplines the composer; freeform gives Joe full expression. **Default: enum (the four members above).**
+- **D007.3 — Empty-file handling.** Ship empty stub files for every product on the initial-set list, or only the ones with real content today? **Default: empty stubs ship** — the pattern is the deliverable.
+- **D007.4 — Calendar reads (layer b) follow-on.** Once (a) is in production, add Calendar reads? **Default: yes, deferred to a follow-on D-entry when (a) has shipped.**
+- **D007.5 — Conversational MCP tools (layer c) follow-on.** Same shape. **Default: deferred; opens once `mcp_tools` lane has the channel-side ratified (D006 → Calendar done in this session).**
+- **D007.6 — `.gitignore` posture.** Should `data/products/*.md` be tracked (the substrate) or untracked (Joe's private state)? **Default: tracked.** The product file IS the substrate; brief composition is reproducible only if state is committed. Joe edits the file → commits the edit → Hanna reads the committed file. Cost: Joe's private blocker notes become git-history; mitigation: he writes the notes accordingly, or per-product files use a `.private.md` extension that IS gitignored for sensitive entries.
+
+**Implications.**
+
+- A new directory `data/products/` joins the repo. Per [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §3 the directory is checked-in. Per §10 the input lane joins the diagram as a new lane upstream of brief composition.
+- The brief composer at `scripts/first_hanna_brief.py:95–104` becomes a function of `(Harlo state, ProducerPhase, product file set)` instead of fiction. The fiction text Joe sees today ("the open lanes from yesterday's session are still where you left them") is replaced by per-product status reads.
+- The `mcp_tools` lane gains `hanna_log` / `hanna_block` candidate tools that write back to the product files via APPEND-ONLY semantics (never overwrite Joe's hand-edits). This is D007.5.
+- Schema completeness gains a `ProductFile` type at `src/schemas.py` — parsed-frontmatter + sections. Becomes part of the schema work [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §3.4 catalogued.
+
+**Related.**
+- [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §12.7 — the audit-added open decision this entry operationalizes.
+- [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §5.6 — the three-layer input-surface sketch.
+- D006 (this session) — channel resolved orthogonally; D007 binds the input side. Symmetry.
+- [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §3.6 — the review's catalog of §12.7 as blocking-pending.
+- D002 — D007 is author-by-main-thread substrate work; the `ProductFile` schema and the brief-composer rewrite become MoE under future dispatches.
+
+---
+
+### D008 — §4 inheritance ratification: Cut six pending items; Review the 33 rules
+
+**Status:** open
+**Date:** 2026-05-22 (draft)
+**Ratified by:** (pending — Joe; per-item ratifiable)
+**Scope:** [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §4 substrate inheritance table (lines 110–125); §12.8 the audit-added per-item ratification requirement; downstream lanes that inherit assumptions from §4 (delegate, stage, computations, hot/warm/cold storage); [`.gitignore`](../.gitignore) dual-venv references (lines 18–20).
+
+**Decision (open — drafts the per-item resolution, awaits ratification).** §4 carries Cut or Review status on seven inherited components from the [2026-05-20 audit](../HANNA_BLUEPRINT.md). This entry proposes the per-item resolution for Joe's ratification (whole-batch or per-item).
+
+**Per-item proposals (each ratifiable independently).**
+
+- **D008.1 — Hydra delegate pattern (`src/delegate_*.py`).** v0.1.0 plan: clone pattern + base class. Audit status: Cut (pending). **Proposed default: Cut.** The delegate pattern was designed for routing tasks across model backends with capability negotiation; Hanna calls Claude. One backend = indirection in search of a purpose. The "second layer" of Rule 34's three-layer enforcement (the `HdProducer` delegate route) collapses into per-tool lockout checks (layer 3), which is acceptable because layer 3 already runs the check structurally per BLUEPRINT §7.
+
+- **D008.2 — USD stage architecture.** v0.1.0 plan: verbatim. Audit status: Cut (pending). **Proposed default: Cut.** USD is a stage-composition language for film pipelines; Hanna's corpus is ~10 briefs/week × ~2KB. SQLite + JSON dominates on every axis at this volume. The PoC at `scripts/first_hanna_brief.py:107–115` already writes to SQLite (`data/hanna.sqlite`); the USD stage was never built. D006's Calendar choice corroborates: Calendar IS the stage for v1. Cut formalizes the de-facto state.
+
+- **D008.3 — Three-tier storage (Hot FTS5 / Warm SDR / Cold USD).** v0.1.0 plan: verbatim. Audit status: Cut (pending). **Proposed default: Cut.** Three-tier storage was sized for sub-2ms cognitive recall under continuous load; Hanna's latency budget is "before coffee gets cold." One SQLite file per logical table (briefs, capsules, snapshots) is the whole job. Cut formalizes; SQLite-only is the substrate.
+
+- **D008.4 — Rust hot path via PyO3.** v0.1.0 plan: inherited via cloned crates. Audit status: Cut (pending). **Proposed default: Cut.** No hot path exists; Hanna runs six events/day on a wall clock. The cloned crates (none of which have shipped in this repo yet) are removed from the lane diagram. Cut formalizes the de-facto state.
+
+- **D008.5 — XGBoost predictor harness.** v0.1.0 plan: verbatim; retrained on producer signals. Audit status: Cut (pending). **Proposed default: Cut.** Two empirical facts force this: (1) Harlo's own predictor is currently inactive (`v9.engine.predictor: false` per [`SPIKE_HARLO_EDGE_2026-05-20.md`](SPIKE_HARLO_EDGE_2026-05-20.md) §4), so there is nothing live to bootstrap from; (2) a hand-coded heuristic ("deadline within 5 working days × in-flight product count") outperforms an undertrained model and ships in 30 minutes. [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §3.6 assumes this Cut.
+
+- **D008.6 — Dual venv (3.12 USD / 3.14 project).** v0.1.0 plan: verbatim. Audit status: Cut (pending). **Proposed default: Cut.** Falls out automatically once D008.2 USD is cut. [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) Action 2 (pyproject.toml + Hanna venv) ratifies a single-venv posture; D008.6 confirms the substrate matches.
+
+- **D008.7 — The 33 inviolable rules (Review).** v0.1.0 plan: inherited verbatim. Audit status: Review (the producer addenda 34–37 stay). **Proposed default: selective re-adoption.** Rules 1–8, 11–17, 19–33 are guardrails for code that doesn't exist in Hanna (hippocampal mutation, motor reflex compilation, inquiry verification). Their compliance greps in [`RULES.md`](../RULES.md) pass trivially because the constrained code isn't there — a green CI light meaning nothing. Re-adopt rules as the underlying components actually land (e.g., Rule 18 RED override stays now because the Harlo bridge respects it via `read_burnout_level`). Annotate each non-active rule in `RULES.md` as "Not yet load-bearing — applies on the session that lands the constrained component" (per [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §13 already-stated convention).
+
+**Reasoning.** All seven items were audited 2026-05-20 against Hanna's actual workload (~10 briefs/week × ~2KB, 6 events/day on a wall clock). The audit's verdict was Cut/Review across the board because each component was sized for Harlo's continuous-cognitive-load workload, not Hanna's wall-clock scheduler. **Ratifying the Cut/Review status (rather than leaving §4 in a "pending ratification" purgatory) lets downstream lanes proceed without inheriting unfaithful assumptions.**
+
+The 33 rules are Review rather than Cut because the *posture* they encode (biological-fidelity, surface-don't-decide, family-first) is producer-applicable even where the specific code isn't. Selective re-adoption preserves the posture.
+
+**Implications.**
+
+- **Lane diagram refresh.** [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §10 build lanes diagram updates: `delegate` lane removed (D008.1), `stage` lane reduced from USD prim authoring to SQLite table inserts (D008.2/3), Rust crates removed from any future lane (D008.4), XGBoost lane removed (D008.5), dual venv removed (D008.6). The diagram becomes smaller and honest.
+- **`HdProducer` delegate code.** No file exists yet. With D008.1 Cut ratified, no file ever ships. The "second layer" of Rule 34 enforcement collapses into per-tool lockout checks (layer 3).
+- **§5 specialization list.** Items "New Hydra delegate" and "New stage prims" in [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §5 get struck-through in the BLUEPRINT update accompanying D008's ratification. The four pure-function computations (`compute_producer_phase` already landed; `compute_brief_priority` / `compute_forcing_function` / `compute_formation_readiness` still to come) stay — that's the Keep-load-bearing inheritance from [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) Audit Log finding #3.
+- **CI compliance greps.** Per D008.7, the trivially-passing greps in `RULES.md` (`sleep`, `while True`, `float32`, `cosine`) get annotated as "applies if the relevant component is landed." Documentation change, not a CI change.
+- **README + BLUEPRINT cleanup.** Once D008 ratifies, the BLUEPRINT §4 table's "Audit status" column becomes "Decision (D008)" with each row carrying Keep / Cut / Review per the ratification. The "pending ratification" tag drops. Separate hygiene-pass commit (per [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §3.3 deferred list).
+
+**Open question parked.** If Joe ratifies all six Cuts and the components have not been built (which is the case for all six at HEAD), is there anything to *remove* from the repo? **Answer: nothing meaningful.** The dual-venv references in `.gitignore:18–20` (`.venv/`, `venv/`, `.venv-*/`) stay (they cover the future Hanna venv after [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) Action 2 lands). The `.gitignore:24–27` USD stage data patterns are cheap and harmless; they can stay. Cut formalizes the de-facto absence; no active removal needed.
+
+**Related.**
+- [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §4 substrate inheritance table — the per-item Cut/Review status this entry ratifies.
+- [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §12.8 — the audit-added per-item ratification requirement.
+- [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) Audit Log finding #2 — "Substrate inheritance is over-scoped for the workload."
+- [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) Audit Log finding #3 — "The single load-bearing inheritance is the pure-function-over-enum pattern."
+- [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §3.6 — the review's catalog of §12.8 as blocking-pending.
+- [`docs/SPIKE_HARLO_EDGE_2026-05-20.md`](SPIKE_HARLO_EDGE_2026-05-20.md) §4 — Harlo's predictor inactive (corroborates D008.5).
+- D001, D003 — prior substrate decisions this entry harmonizes with.
+- D006 (this session) — Calendar channel choice corroborates D008.2 (USD Cut).
+- D002 — D008 is author-by-main-thread substrate work; ratifying the Cuts means no MoE follow-on is needed for the components themselves; the dropped lane diagram is a documentation change.
+
+---
+
 ## End of decisions log
 
-Next decision number: **D007**.
+Next decision number: **D009**.
