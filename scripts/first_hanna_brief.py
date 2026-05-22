@@ -33,15 +33,7 @@ CREATE TABLE IF NOT EXISTS briefs (
 
 
 def _phase_now() -> ProducerPhase:
-    now = datetime.now(ZoneInfo("America/New_York"))
-    try:
-        return compute_producer_phase(now, ProducerPhase.MORNING)
-    except NotImplementedError:
-        if now.hour < 11:
-            return ProducerPhase.MORNING
-        if now.hour < 14:
-            return ProducerPhase.MIDDAY
-        return ProducerPhase.EVENING
+    return compute_producer_phase(datetime.now(ZoneInfo("America/New_York")), ProducerPhase.MORNING)
 
 
 def _utc_ts() -> str:

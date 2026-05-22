@@ -22,20 +22,21 @@ def compute_producer_phase(
     weekly_friday_hour: int = 16,
     monthly_day: int = 1,
 ) -> ProducerPhase:
-    """Compute producer phase. Outside Mon–Fri 09–17 ET → FAMILY_LOCKOUT (Rule 34)."""
+    """Return the current ProducerPhase given a tz-aware datetime. Total over the seven enum members."""
+    # prev_phase: unused at v1 — no hysteresis per ROADMAP §4 L3a
     if now.tzinfo is None:
         raise ValueError("compute_producer_phase requires a timezone-aware datetime")
     now = now.astimezone(_ET)
     if now.weekday() >= 5 or not (work_start_hour <= now.hour < work_end_hour):
         return ProducerPhase.FAMILY_LOCKOUT
     if now.day == monthly_day:
-        raise NotImplementedError("Session 03")
+        return ProducerPhase.MONTHLY
     if now.weekday() == 0 and now.hour == weekly_monday_hour:
-        raise NotImplementedError("Session 03")
+        return ProducerPhase.WEEKLY_MONDAY
     if now.weekday() == 4 and now.hour == weekly_friday_hour:
-        raise NotImplementedError("Session 03")
+        return ProducerPhase.WEEKLY_FRIDAY
     if now.hour < morning_end_hour:
-        raise NotImplementedError("Session 03")
+        return ProducerPhase.MORNING
     if now.hour < midday_end_hour:
-        raise NotImplementedError("Session 03")
-    raise NotImplementedError("Session 03")
+        return ProducerPhase.MIDDAY
+    return ProducerPhase.EVENING

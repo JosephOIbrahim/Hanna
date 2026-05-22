@@ -288,7 +288,7 @@ This is the single source of truth the `/hanna-dispatch-next` slash command read
 |---|---|---|---|
 | L1 — D008 propagation | **done** | `docs(blueprint): propagate D008 ratification (L1)` (this commit; see `git log --grep "L1"`) | L2 |
 | L2 — Substrate hygiene | **done** | `feat(substrate): pyproject.toml + CI workflow + conftest + gitignore (L2)` (this commit; see `git log --grep "L2"`) | L3a, L3b |
-| L3a — Session 03 phase bodies | queued | — | L4a |
+| L3a — Session 03 phase bodies | **done** | `feat(computations): land six phase branches — compute_producer_phase total (L3a)` (this commit; see `git log --grep "L3a"`) | L4a |
 | L3b — D005 bridge hardening | queued | — | L4b |
 | L4a — D007 product files + composer rewrite | queued | — | L4b, L5 |
 | L4b — D006 calendar.py | queued | — | L6 |
