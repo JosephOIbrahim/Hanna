@@ -248,43 +248,43 @@ The "20 lines" bound was chosen empirically: D003's amended files place the trai
 
 ### D005 — Harlo bridge hardening (rate-limit + read timeout + stderr drain)
 
-**Status:** open
-**Date:** 2026-05-22 (draft)
-**Ratified by:** (pending — Joe)
-**Scope:** [`src/harlo_bridge.py`](../src/harlo_bridge.py); [D001](#) rate-limit ownership implication; [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §9 (Harlo read edges); [`NEXT.md`](../NEXT.md) §"Parked for D005".
+**Status:** resolved
+**Date:** 2026-05-22
+**Ratified by:** Joe (Joseph Ibrahim) — whole-batch ratification alongside D007 and D008
+**Scope:** [`src/harlo_bridge.py`](../src/harlo_bridge.py); [D001](#) rate-limit ownership implication; [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §9 (Harlo read edges); [`NEXT.md`](../NEXT.md) §"D005 — RESOLVED" section.
 
-**Decision.** Three sub-decisions on bridge hardening are bundled here because they share a substrate question (*how does the bridge handle slow, hung, or noisy Harlo subprocesses*) and the same review surface. Each carries a proposed default. Status remains **open** until Joe ratifies; the per-instance status quo holds in the meantime.
+**Decision.** Three sub-decisions on bridge hardening are bundled here because they share a substrate question (*how does the bridge handle slow, hung, or noisy Harlo subprocesses*) and the same review surface. Each was drafted with a proposed default; the three defaults are now **ratified whole-batch** as the resolution. The implementation lane (MoE Dispatch #2: Bridge Engineer + Compliance Reviewer per D002) is unblocked.
 
 **Sub-decision D005.1 — Coach rate-limit semantic.** Current implementation: per-instance via the `_coach_driven` boolean (`src/harlo_bridge.py:43, 85–89`). [D001](#) mandate: "≤1 call **per brief composition**" with the rate limit living in the bridge, not in calling code. The boolean enforces "≤1 per `HarloBridge` instance, ever" — wrong shape for any caller that composes more than one brief from a single bridge instance (e.g., a future Friday harvest + brief, or any long-lived MCP server). Three candidate readings:
 - **(a)** `begin_composition(composition_id: str)` / `end_composition()` scope methods on the bridge — composition-id-keyed, resets the per-composition gate on each `begin`. Matches D001's "rate limit lives in the bridge" implication while preserving the per-composition semantic across long-lived callers.
 - **(b)** Token-bucket rate limit (TTL-based reset, e.g. 5-min cooldown) — looser; survives long-lived processes without explicit scoping but blurs the "per composition" contract into a wall-clock heuristic.
 - **(c)** Document per-instance as the contract; require callers to instantiate one bridge per composition — punishes long-lived callers but is the smallest code change.
 
-**Default proposed (open): (a).** Preserves D001's stated semantic; explicit; testable.
+**Resolution: (a) — `begin_composition` / `end_composition` scope methods.** Preserves D001's stated semantic; explicit; testable.
 
 **Sub-decision D005.2 — `_read_frame` timeout liveness.** Current implementation: `timeout` parameter plumbed through `_rpc → _read_frame` (`src/harlo_bridge.py:143, 149, 176`) but never consulted; the body uses blocking `proc.stdout.readline()` and `proc.stdout.read(content_length)`. A hung Harlo subprocess freezes the bridge indefinitely. Surfaced in `NEXT.md:50`. Three candidate readings:
 - **(a)** `selectors.DefaultSelector` with `register(proc.stdout, EVENT_READ)` and `select(timeout=…)` per frame. Stdlib only.
 - **(b)** Background reader thread + `queue.Queue.get(timeout=…)` per frame. Decouples I/O from the RPC loop but adds thread-lifecycle to the bridge.
 - **(c)** Replace MCP-stdio framing with a structured-RPC library that has built-in timeouts. Largest change; adds dependency surface.
 
-**Default proposed (open): (a).** Lowest dependency surface; matches the bridge's existing single-threaded posture.
+**Resolution: (a) — `selectors.DefaultSelector` with `select(timeout=…)` per frame.** Lowest dependency surface; matches the bridge's existing single-threaded posture.
 
 **Sub-decision D005.3 — stderr drain.** Current implementation: `subprocess.Popen(..., stderr=subprocess.PIPE, ...)` (`src/harlo_bridge.py:116`); no reader thread or call. Once Harlo writes ~64KB to stderr (OS pipe-buffer default), the subprocess blocks on the next stderr write — deadlocking the bridge. Surfaced in `NEXT.md:51`. Two candidate readings:
 - **(a)** Background drainer thread reading `proc.stderr` to a bounded ring buffer (e.g., last 64 lines) accessible via `bridge.last_stderr()` for diagnostics. Preserves debuggability.
 - **(b)** Switch to `stderr=subprocess.DEVNULL` — lose Harlo's stderr diagnostics, gain simplicity.
 
-**Default proposed (open): (a) with ring buffer.** Preserves the diagnostic signal without the deadlock; the ring buffer bound keeps memory deterministic.
+**Resolution: (a) — background drainer thread + bounded ring buffer.** Preserves the diagnostic signal without the deadlock; the ring buffer bound keeps memory deterministic.
 
 **Reasoning.** All three sub-decisions surfaced during Session 02 (D005.2 and D005.3 via `NEXT.md:46–53`) or via the senior review that triggered this draft (D005.1). They share the same architectural surface (`src/harlo_bridge.py`), the same expert assignment under D002 (Bridge Engineer), and the same caller (today: `scripts/first_hanna_brief.py`; future: every MCP tool). Bundling them avoids three separate ratification cycles for what is materially one "harden the bridge" decision. Each sub-decision carries its own default so Joe can ratify in whole or per-item.
 
 The choice of `(a)` defaults across all three is guided by the same principle: prefer the smallest stdlib-only change that preserves the contract's stated semantic. None of the `(a)` options introduce new dependencies or change the bridge's caller-facing API surface beyond adding new methods (D005.1 `begin_composition`/`end_composition`, D005.3 `last_stderr`).
 
 **Implications.**
-- Until ratified, **no code lands on any of the three sub-decisions.** The status quo holds: rate limit is per-instance (caller workaround: instantiate one `HarloBridge` per brief composition, which `scripts/first_hanna_brief.py` accidentally already does); `_read_frame` blocks indefinitely on hang; stderr deadlocks at ~64KB.
-- The current `scripts/first_hanna_brief.py` posture (one bridge per run via the `with`-block landed in commit `3cdd516`) accidentally honors D005.1's intent — no regression while D005 is open.
-- Once ratified: a single MoE Dispatch #2 (Bridge Engineer + Compliance Reviewer per D002) lands all three. Estimated ~50–80 lines depending on the selected defaults.
-- Until ratification, calling code may proceed defensively: short-lived bridge instances, generous Harlo subprocess kill timeouts via process supervisors, etc.
-- The bridge's public method docstrings should name the relevant sub-decision (D005.1) once the rate-limit shape is ratified — per [D001](#) Implications bullet 4, Rule 35 compliance is meant to be reviewable at the diff level.
+- **Ratified — implementation lane is unblocked.** MoE Dispatch #2 (Bridge Engineer + Compliance Reviewer per D002) lands all three. Estimated ~50–80 lines.
+- Until MoE Dispatch #2 lands, the status quo holds: rate limit is per-instance (caller workaround: instantiate one `HarloBridge` per brief composition, which `scripts/first_hanna_brief.py` accidentally already does via the `with`-block landed in commit `3cdd516`); `_read_frame` blocks indefinitely on hang; stderr deadlocks at ~64KB. Calling code may proceed defensively in the gap: short-lived bridge instances, generous Harlo subprocess kill timeouts via process supervisors, etc.
+- The bridge's public method docstrings should name the relevant sub-decision (D005.1) once the rate-limit shape lands — per [D001](#) Implications bullet 4, Rule 35 compliance is meant to be reviewable at the diff level.
+- The `_read_frame` timeout-parameter plumbing already exists at `src/harlo_bridge.py:143, 149, 176` — D005.2 only needs to wire the body to the parameter, not introduce the parameter.
+- Tests for the three items will live under the eventual `tests/test_harlo_bridge.py` (catalogued as can-land-anytime per [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §3.7).
 
 **Related.**
 - [D001](#d001--rule-35-permissive-reading-exchange_index-advance-is-not-a-write) — establishes the rate-limit ownership requirement ("the rate limit lives in the bridge, not in calling code").
@@ -345,12 +345,12 @@ The audit's recommended 3-day test was the disciplined path. Skipping it is cons
 
 ### D007 — Input surface MVS: per-product `.md` files
 
-**Status:** open
-**Date:** 2026-05-22 (draft)
-**Ratified by:** (pending — Joe; per-item ratifiable)
+**Status:** resolved
+**Date:** 2026-05-22
+**Ratified by:** Joe (Joseph Ibrahim) — whole-batch ratification alongside D005 and D008
 **Scope:** [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §12.7 (audit-added input surface decision); §5.6 "Input surface" lines 196–203; the brief composer's source-of-state (currently fiction at `scripts/first_hanna_brief.py:95–104`); the future `mcp_tools` lane (`hanna_log` / `hanna_block` candidates).
 
-**Decision (open — drafts the surface, awaits ratification).** Hanna's input surface for v1 is **per-product markdown files at `data/products/{name}.md`**. One file per portfolio product. Joe edits the file directly when state changes. File mtime is the freshness signal. The brief composer reads the file set on each compose call and renders accordingly.
+**Decision.** Hanna's input surface for v1 is **per-product markdown files at `data/products/{name}.md`**. One file per portfolio product. Joe edits the file directly when state changes. File mtime is the freshness signal. The brief composer reads the file set on each compose call and renders accordingly. The six sub-decisions below (D007.1–D007.6) are **ratified whole-batch** at their proposed defaults.
 
 **Reasoning.** Per [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §5.6, three candidate input layers were sketched:
 
@@ -394,14 +394,14 @@ The frontmatter is YAML-style; the body is plain markdown with named sections. T
 
 **Initial product set** (matches [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §5 line 186, expandable per session): `harlo`, `octavius`, `moneta`, `comfy_cozy`. The MVS ships with these four files at `data/products/{name}.md`, even if some are empty stubs — the directory and pattern are the deliverable, not the prose.
 
-**Open per-item questions (default named, ratify or revise).**
+**Per-item resolutions (ratified whole-batch 2026-05-22).**
 
-- **D007.1 — Frontmatter format.** YAML-style (default), TOML, or no frontmatter (sections only). YAML matches the modern markdown convention; TOML is type-strict; no-frontmatter is plain. **Default: YAML.**
-- **D007.2 — `status` enum.** `{in_flight, parked, shipped, exploring}` (default), or freeform string. An enum disciplines the composer; freeform gives Joe full expression. **Default: enum (the four members above).**
-- **D007.3 — Empty-file handling.** Ship empty stub files for every product on the initial-set list, or only the ones with real content today? **Default: empty stubs ship** — the pattern is the deliverable.
-- **D007.4 — Calendar reads (layer b) follow-on.** Once (a) is in production, add Calendar reads? **Default: yes, deferred to a follow-on D-entry when (a) has shipped.**
-- **D007.5 — Conversational MCP tools (layer c) follow-on.** Same shape. **Default: deferred; opens once `mcp_tools` lane has the channel-side ratified (D006 → Calendar done in this session).**
-- **D007.6 — `.gitignore` posture.** Should `data/products/*.md` be tracked (the substrate) or untracked (Joe's private state)? **Default: tracked.** The product file IS the substrate; brief composition is reproducible only if state is committed. Joe edits the file → commits the edit → Hanna reads the committed file. Cost: Joe's private blocker notes become git-history; mitigation: he writes the notes accordingly, or per-product files use a `.private.md` extension that IS gitignored for sensitive entries.
+- **D007.1 — Frontmatter format.** YAML-style, TOML, or no frontmatter (sections only). YAML matches the modern markdown convention; TOML is type-strict; no-frontmatter is plain. **Ratified: YAML.**
+- **D007.2 — `status` enum.** `{in_flight, parked, shipped, exploring}`, or freeform string. An enum disciplines the composer; freeform gives Joe full expression. **Ratified: enum (the four members above).**
+- **D007.3 — Empty-file handling.** Ship empty stub files for every product on the initial-set list, or only the ones with real content today? **Ratified: empty stubs ship** — the pattern is the deliverable.
+- **D007.4 — Calendar reads (layer b) follow-on.** Once (a) is in production, add Calendar reads? **Ratified: yes, deferred to a follow-on D-entry when (a) has shipped.**
+- **D007.5 — Conversational MCP tools (layer c) follow-on.** Same shape. **Ratified: deferred; opens once `mcp_tools` lane has the channel-side ratified (D006 → Calendar already done in this session).**
+- **D007.6 — `.gitignore` posture.** Should `data/products/*.md` be tracked (the substrate) or untracked (Joe's private state)? **Ratified: tracked.** The product file IS the substrate; brief composition is reproducible only if state is committed. Joe edits the file → commits the edit → Hanna reads the committed file. Cost: Joe's private blocker notes become git-history; mitigation: he writes the notes accordingly, or per-product files use a `.private.md` extension that IS gitignored for sensitive entries.
 
 **Implications.**
 
@@ -421,28 +421,28 @@ The frontmatter is YAML-style; the body is plain markdown with named sections. T
 
 ### D008 — §4 inheritance ratification: Cut six pending items; Review the 33 rules
 
-**Status:** open
-**Date:** 2026-05-22 (draft)
-**Ratified by:** (pending — Joe; per-item ratifiable)
+**Status:** resolved
+**Date:** 2026-05-22
+**Ratified by:** Joe (Joseph Ibrahim) — whole-batch ratification alongside D005 and D007
 **Scope:** [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §4 substrate inheritance table (lines 110–125); §12.8 the audit-added per-item ratification requirement; downstream lanes that inherit assumptions from §4 (delegate, stage, computations, hot/warm/cold storage); [`.gitignore`](../.gitignore) dual-venv references (lines 18–20).
 
-**Decision (open — drafts the per-item resolution, awaits ratification).** §4 carries Cut or Review status on seven inherited components from the [2026-05-20 audit](../HANNA_BLUEPRINT.md). This entry proposes the per-item resolution for Joe's ratification (whole-batch or per-item).
+**Decision.** §4 carries Cut or Review status on seven inherited components from the [2026-05-20 audit](../HANNA_BLUEPRINT.md). All seven per-item proposals below were **ratified whole-batch** as the resolution: six items Cut (D008.1–D008.6), one Reviewed with selective re-adoption (D008.7).
 
-**Per-item proposals (each ratifiable independently).**
+**Per-item resolutions (ratified whole-batch 2026-05-22).**
 
-- **D008.1 — Hydra delegate pattern (`src/delegate_*.py`).** v0.1.0 plan: clone pattern + base class. Audit status: Cut (pending). **Proposed default: Cut.** The delegate pattern was designed for routing tasks across model backends with capability negotiation; Hanna calls Claude. One backend = indirection in search of a purpose. The "second layer" of Rule 34's three-layer enforcement (the `HdProducer` delegate route) collapses into per-tool lockout checks (layer 3), which is acceptable because layer 3 already runs the check structurally per BLUEPRINT §7.
+- **D008.1 — Hydra delegate pattern (`src/delegate_*.py`).** v0.1.0 plan: clone pattern + base class. Audit status: Cut (pending). **Ratified: Cut.** The delegate pattern was designed for routing tasks across model backends with capability negotiation; Hanna calls Claude. One backend = indirection in search of a purpose. The "second layer" of Rule 34's three-layer enforcement (the `HdProducer` delegate route) collapses into per-tool lockout checks (layer 3), which is acceptable because layer 3 already runs the check structurally per BLUEPRINT §7.
 
-- **D008.2 — USD stage architecture.** v0.1.0 plan: verbatim. Audit status: Cut (pending). **Proposed default: Cut.** USD is a stage-composition language for film pipelines; Hanna's corpus is ~10 briefs/week × ~2KB. SQLite + JSON dominates on every axis at this volume. The PoC at `scripts/first_hanna_brief.py:107–115` already writes to SQLite (`data/hanna.sqlite`); the USD stage was never built. D006's Calendar choice corroborates: Calendar IS the stage for v1. Cut formalizes the de-facto state.
+- **D008.2 — USD stage architecture.** v0.1.0 plan: verbatim. Audit status: Cut (pending). **Ratified: Cut.** USD is a stage-composition language for film pipelines; Hanna's corpus is ~10 briefs/week × ~2KB. SQLite + JSON dominates on every axis at this volume. The PoC at `scripts/first_hanna_brief.py:107–115` already writes to SQLite (`data/hanna.sqlite`); the USD stage was never built. D006's Calendar choice corroborates: Calendar IS the stage for v1. Cut formalizes the de-facto state.
 
-- **D008.3 — Three-tier storage (Hot FTS5 / Warm SDR / Cold USD).** v0.1.0 plan: verbatim. Audit status: Cut (pending). **Proposed default: Cut.** Three-tier storage was sized for sub-2ms cognitive recall under continuous load; Hanna's latency budget is "before coffee gets cold." One SQLite file per logical table (briefs, capsules, snapshots) is the whole job. Cut formalizes; SQLite-only is the substrate.
+- **D008.3 — Three-tier storage (Hot FTS5 / Warm SDR / Cold USD).** v0.1.0 plan: verbatim. Audit status: Cut (pending). **Ratified: Cut.** Three-tier storage was sized for sub-2ms cognitive recall under continuous load; Hanna's latency budget is "before coffee gets cold." One SQLite file per logical table (briefs, capsules, snapshots) is the whole job. Cut formalizes; SQLite-only is the substrate.
 
-- **D008.4 — Rust hot path via PyO3.** v0.1.0 plan: inherited via cloned crates. Audit status: Cut (pending). **Proposed default: Cut.** No hot path exists; Hanna runs six events/day on a wall clock. The cloned crates (none of which have shipped in this repo yet) are removed from the lane diagram. Cut formalizes the de-facto state.
+- **D008.4 — Rust hot path via PyO3.** v0.1.0 plan: inherited via cloned crates. Audit status: Cut (pending). **Ratified: Cut.** No hot path exists; Hanna runs six events/day on a wall clock. The cloned crates (none of which have shipped in this repo yet) are removed from the lane diagram. Cut formalizes the de-facto state.
 
-- **D008.5 — XGBoost predictor harness.** v0.1.0 plan: verbatim; retrained on producer signals. Audit status: Cut (pending). **Proposed default: Cut.** Two empirical facts force this: (1) Harlo's own predictor is currently inactive (`v9.engine.predictor: false` per [`SPIKE_HARLO_EDGE_2026-05-20.md`](SPIKE_HARLO_EDGE_2026-05-20.md) §4), so there is nothing live to bootstrap from; (2) a hand-coded heuristic ("deadline within 5 working days × in-flight product count") outperforms an undertrained model and ships in 30 minutes. [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §3.6 assumes this Cut.
+- **D008.5 — XGBoost predictor harness.** v0.1.0 plan: verbatim; retrained on producer signals. Audit status: Cut (pending). **Ratified: Cut.** Two empirical facts force this: (1) Harlo's own predictor is currently inactive (`v9.engine.predictor: false` per [`SPIKE_HARLO_EDGE_2026-05-20.md`](SPIKE_HARLO_EDGE_2026-05-20.md) §4), so there is nothing live to bootstrap from; (2) a hand-coded heuristic ("deadline within 5 working days × in-flight product count") outperforms an undertrained model and ships in 30 minutes. [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) §3.6 assumes this Cut.
 
-- **D008.6 — Dual venv (3.12 USD / 3.14 project).** v0.1.0 plan: verbatim. Audit status: Cut (pending). **Proposed default: Cut.** Falls out automatically once D008.2 USD is cut. [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) Action 2 (pyproject.toml + Hanna venv) ratifies a single-venv posture; D008.6 confirms the substrate matches.
+- **D008.6 — Dual venv (3.12 USD / 3.14 project).** v0.1.0 plan: verbatim. Audit status: Cut (pending). **Ratified: Cut.** Falls out automatically once D008.2 USD is cut. [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) Action 2 (pyproject.toml + Hanna venv) ratifies a single-venv posture; D008.6 confirms the substrate matches.
 
-- **D008.7 — The 33 inviolable rules (Review).** v0.1.0 plan: inherited verbatim. Audit status: Review (the producer addenda 34–37 stay). **Proposed default: selective re-adoption.** Rules 1–8, 11–17, 19–33 are guardrails for code that doesn't exist in Hanna (hippocampal mutation, motor reflex compilation, inquiry verification). Their compliance greps in [`RULES.md`](../RULES.md) pass trivially because the constrained code isn't there — a green CI light meaning nothing. Re-adopt rules as the underlying components actually land (e.g., Rule 18 RED override stays now because the Harlo bridge respects it via `read_burnout_level`). Annotate each non-active rule in `RULES.md` as "Not yet load-bearing — applies on the session that lands the constrained component" (per [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §13 already-stated convention).
+- **D008.7 — The 33 inviolable rules (Review).** v0.1.0 plan: inherited verbatim. Audit status: Review (the producer addenda 34–37 stay). **Ratified: Review with selective re-adoption.** Rules 1–8, 11–17, 19–33 are guardrails for code that doesn't exist in Hanna (hippocampal mutation, motor reflex compilation, inquiry verification). Their compliance greps in [`RULES.md`](../RULES.md) pass trivially because the constrained code isn't there — a green CI light meaning nothing. Re-adopt rules as the underlying components actually land (e.g., Rule 18 RED override stays now because the Harlo bridge respects it via `read_burnout_level`). Annotate each non-active rule in `RULES.md` as "Not yet load-bearing — applies on the session that lands the constrained component" (per [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §13 already-stated convention).
 
 **Reasoning.** All seven items were audited 2026-05-20 against Hanna's actual workload (~10 briefs/week × ~2KB, 6 events/day on a wall clock). The audit's verdict was Cut/Review across the board because each component was sized for Harlo's continuous-cognitive-load workload, not Hanna's wall-clock scheduler. **Ratifying the Cut/Review status (rather than leaving §4 in a "pending ratification" purgatory) lets downstream lanes proceed without inheriting unfaithful assumptions.**
 
