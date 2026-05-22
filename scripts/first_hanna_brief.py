@@ -37,7 +37,11 @@ def _phase_now() -> ProducerPhase:
     try:
         return compute_producer_phase(now, ProducerPhase.MORNING)
     except NotImplementedError:
-        return ProducerPhase.MORNING
+        if now.hour < 11:
+            return ProducerPhase.MORNING
+        if now.hour < 14:
+            return ProducerPhase.MIDDAY
+        return ProducerPhase.EVENING
 
 
 def _utc_ts() -> str:
