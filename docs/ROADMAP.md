@@ -290,7 +290,7 @@ This is the single source of truth the `/hanna-dispatch-next` slash command read
 | L2 — Substrate hygiene | **done** | `feat(substrate): pyproject.toml + CI workflow + conftest + gitignore (L2)` (this commit; see `git log --grep "L2"`) | L3a, L3b |
 | L3a — Session 03 phase bodies | **done** | `feat(computations): land six phase branches — compute_producer_phase total (L3a)` (this commit; see `git log --grep "L3a"`) | L4a |
 | L3b — D005 bridge hardening | queued | — | L4b |
-| L4a — D007 product files + composer rewrite | queued | — | L4b, L5 |
+| L4a — D007 product files + composer rewrite | **done** | `feat(composer): ProductFile + BriefPayload schemas + compute_brief_priority + composer rewrite (L4a)` (this commit; see `git log --grep "L4a"`) | L4b, L5 |
 | L4b — D006 calendar.py | queued | — | L6 |
 | L5 — Schemas 2–5 | queued | — | L6 |
 | L6 — `mcp_tools` lane | queued | — | L7 |
