@@ -246,6 +246,57 @@ The "20 lines" bound was chosen empirically: D003's amended files place the trai
 
 ---
 
+### D005 — Harlo bridge hardening (rate-limit + read timeout + stderr drain)
+
+**Status:** open
+**Date:** 2026-05-22 (draft)
+**Ratified by:** (pending — Joe)
+**Scope:** [`src/harlo_bridge.py`](../src/harlo_bridge.py); [D001](#) rate-limit ownership implication; [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) §9 (Harlo read edges); [`NEXT.md`](../NEXT.md) §"Parked for D005".
+
+**Decision.** Three sub-decisions on bridge hardening are bundled here because they share a substrate question (*how does the bridge handle slow, hung, or noisy Harlo subprocesses*) and the same review surface. Each carries a proposed default. Status remains **open** until Joe ratifies; the per-instance status quo holds in the meantime.
+
+**Sub-decision D005.1 — Coach rate-limit semantic.** Current implementation: per-instance via the `_coach_driven` boolean (`src/harlo_bridge.py:43, 85–89`). [D001](#) mandate: "≤1 call **per brief composition**" with the rate limit living in the bridge, not in calling code. The boolean enforces "≤1 per `HarloBridge` instance, ever" — wrong shape for any caller that composes more than one brief from a single bridge instance (e.g., a future Friday harvest + brief, or any long-lived MCP server). Three candidate readings:
+- **(a)** `begin_composition(composition_id: str)` / `end_composition()` scope methods on the bridge — composition-id-keyed, resets the per-composition gate on each `begin`. Matches D001's "rate limit lives in the bridge" implication while preserving the per-composition semantic across long-lived callers.
+- **(b)** Token-bucket rate limit (TTL-based reset, e.g. 5-min cooldown) — looser; survives long-lived processes without explicit scoping but blurs the "per composition" contract into a wall-clock heuristic.
+- **(c)** Document per-instance as the contract; require callers to instantiate one bridge per composition — punishes long-lived callers but is the smallest code change.
+
+**Default proposed (open): (a).** Preserves D001's stated semantic; explicit; testable.
+
+**Sub-decision D005.2 — `_read_frame` timeout liveness.** Current implementation: `timeout` parameter plumbed through `_rpc → _read_frame` (`src/harlo_bridge.py:143, 149, 176`) but never consulted; the body uses blocking `proc.stdout.readline()` and `proc.stdout.read(content_length)`. A hung Harlo subprocess freezes the bridge indefinitely. Surfaced in `NEXT.md:50`. Three candidate readings:
+- **(a)** `selectors.DefaultSelector` with `register(proc.stdout, EVENT_READ)` and `select(timeout=…)` per frame. Stdlib only.
+- **(b)** Background reader thread + `queue.Queue.get(timeout=…)` per frame. Decouples I/O from the RPC loop but adds thread-lifecycle to the bridge.
+- **(c)** Replace MCP-stdio framing with a structured-RPC library that has built-in timeouts. Largest change; adds dependency surface.
+
+**Default proposed (open): (a).** Lowest dependency surface; matches the bridge's existing single-threaded posture.
+
+**Sub-decision D005.3 — stderr drain.** Current implementation: `subprocess.Popen(..., stderr=subprocess.PIPE, ...)` (`src/harlo_bridge.py:116`); no reader thread or call. Once Harlo writes ~64KB to stderr (OS pipe-buffer default), the subprocess blocks on the next stderr write — deadlocking the bridge. Surfaced in `NEXT.md:51`. Two candidate readings:
+- **(a)** Background drainer thread reading `proc.stderr` to a bounded ring buffer (e.g., last 64 lines) accessible via `bridge.last_stderr()` for diagnostics. Preserves debuggability.
+- **(b)** Switch to `stderr=subprocess.DEVNULL` — lose Harlo's stderr diagnostics, gain simplicity.
+
+**Default proposed (open): (a) with ring buffer.** Preserves the diagnostic signal without the deadlock; the ring buffer bound keeps memory deterministic.
+
+**Reasoning.** All three sub-decisions surfaced during Session 02 (D005.2 and D005.3 via `NEXT.md:46–53`) or via the senior review that triggered this draft (D005.1). They share the same architectural surface (`src/harlo_bridge.py`), the same expert assignment under D002 (Bridge Engineer), and the same caller (today: `scripts/first_hanna_brief.py`; future: every MCP tool). Bundling them avoids three separate ratification cycles for what is materially one "harden the bridge" decision. Each sub-decision carries its own default so Joe can ratify in whole or per-item.
+
+The choice of `(a)` defaults across all three is guided by the same principle: prefer the smallest stdlib-only change that preserves the contract's stated semantic. None of the `(a)` options introduce new dependencies or change the bridge's caller-facing API surface beyond adding new methods (D005.1 `begin_composition`/`end_composition`, D005.3 `last_stderr`).
+
+**Implications.**
+- Until ratified, **no code lands on any of the three sub-decisions.** The status quo holds: rate limit is per-instance (caller workaround: instantiate one `HarloBridge` per brief composition, which `scripts/first_hanna_brief.py` accidentally already does); `_read_frame` blocks indefinitely on hang; stderr deadlocks at ~64KB.
+- The current `scripts/first_hanna_brief.py` posture (one bridge per run via the `with`-block landed in commit `3cdd516`) accidentally honors D005.1's intent — no regression while D005 is open.
+- Once ratified: a single MoE Dispatch #2 (Bridge Engineer + Compliance Reviewer per D002) lands all three. Estimated ~50–80 lines depending on the selected defaults.
+- Until ratification, calling code may proceed defensively: short-lived bridge instances, generous Harlo subprocess kill timeouts via process supervisors, etc.
+- The bridge's public method docstrings should name the relevant sub-decision (D005.1) once the rate-limit shape is ratified — per [D001](#) Implications bullet 4, Rule 35 compliance is meant to be reviewable at the diff level.
+
+**Related.**
+- [D001](#d001--rule-35-permissive-reading-exchange_index-advance-is-not-a-write) — establishes the rate-limit ownership requirement ("the rate limit lives in the bridge, not in calling code").
+- [D002](#d002--mixture-of-experts-agent-team-execution-model-for-substrate-level-work) — names Bridge Engineer as the dispatcher for the eventual implementation.
+- [`NEXT.md`](../NEXT.md) §"Parked for D005" — the two pre-existing parked items (D005.2 and D005.3).
+- Senior review (2026-05-22) — surfaced D005.1.
+- `HarloBridge._coach_driven` (`src/harlo_bridge.py:43, 85–89`) — current implementation of D005.1's status quo.
+- `HarloBridge._read_frame` (`src/harlo_bridge.py:176–201`) — current implementation of D005.2's status quo.
+- `HarloBridge` subprocess construction (`src/harlo_bridge.py:112–127`) — current implementation of D005.3's status quo.
+
+---
+
 ## End of decisions log
 
-Next decision number: **D005**.
+Next decision number: **D006**.
