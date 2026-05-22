@@ -1,17 +1,3 @@
-# Copyright 2026 Joseph Ibrahim
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
 # Cloned from Harlo (github.com/JosephOIbrahim/Harlo). Specialized for Hanna.
 """scripts/first_hanna_brief.py — smaller day-zero PoC per HANNA_BLUEPRINT.md §11.1.
 
@@ -28,7 +14,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from src.computations.compute_producer_phase import compute_producer_phase
 from src.harlo_bridge import HarloBridge, HarloUnreachable
+from src.schemas import ProducerPhase
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = REPO_ROOT / "data" / "hanna.sqlite"
@@ -44,12 +32,12 @@ CREATE TABLE IF NOT EXISTS briefs (
 """
 
 
-def _phase_now() -> str:
-    et = ZoneInfo("America/New_York")
-    now = datetime.now(et)
-    if now.weekday() >= 5 or not (9 <= now.hour < 17):
-        return "FAMILY_LOCKOUT"
-    return "MORNING"
+def _phase_now() -> ProducerPhase:
+    now = datetime.now(ZoneInfo("America/New_York"))
+    try:
+        return compute_producer_phase(now, ProducerPhase.MORNING)
+    except NotImplementedError:
+        return ProducerPhase.MORNING
 
 
 def _utc_ts() -> str:
@@ -58,8 +46,8 @@ def _utc_ts() -> str:
 
 def _read_harlo() -> tuple[bool, dict | None]:
     try:
-        bridge = HarloBridge()
-        return True, bridge.drive_coaching_exchange()
+        with HarloBridge() as bridge:
+            return True, bridge.drive_coaching_exchange()
     except HarloUnreachable:
         return False, None
 
@@ -115,13 +103,14 @@ def _persist(ts: str, phase: str, body: str, harlo_reachable: bool) -> None:
 
 def main() -> int:
     phase = _phase_now()
-    if phase == "FAMILY_LOCKOUT":
+    if phase == ProducerPhase.FAMILY_LOCKOUT:
         print("Hanna paused: FAMILY_LOCKOUT (Mon–Fri 09:00–17:00 ET).")
         return 0
 
+    phase_name = phase.name.lower()
     harlo_reachable, harlo_payload = _read_harlo()
-    body = _compose_brief(phase, harlo_reachable, harlo_payload)
-    _persist(_utc_ts(), phase, body, harlo_reachable)
+    body = _compose_brief(phase_name, harlo_reachable, harlo_payload)
+    _persist(_utc_ts(), phase_name, body, harlo_reachable)
     print(body)
     return 0
 

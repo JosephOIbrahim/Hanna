@@ -1,11 +1,14 @@
 # Cloned from Harlo (github.com/JosephOIbrahim/Harlo). Specialized for Hanna.
-"""Pure function: compute producer phase transitions."""
+"""Pure function: compute producer phase transitions. Requires tz-aware datetime; normalized to ET."""
 
 from __future__ import annotations
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from src.schemas import ProducerPhase
+
+_ET = ZoneInfo("America/New_York")
 
 
 def compute_producer_phase(
@@ -20,8 +23,11 @@ def compute_producer_phase(
     monthly_day: int = 1,
 ) -> ProducerPhase:
     """Compute producer phase. Outside Mon–Fri 09–17 ET → FAMILY_LOCKOUT (Rule 34)."""
+    if now.tzinfo is None:
+        raise ValueError("compute_producer_phase requires a timezone-aware datetime")
+    now = now.astimezone(_ET)
     if now.weekday() >= 5 or not (work_start_hour <= now.hour < work_end_hour):
-        raise NotImplementedError("Session 03")
+        return ProducerPhase.FAMILY_LOCKOUT
     if now.day == monthly_day:
         raise NotImplementedError("Session 03")
     if now.weekday() == 0 and now.hour == weekly_monday_hour:
