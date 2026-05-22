@@ -1,37 +1,35 @@
-# Copyright 2026 Joseph Ibrahim
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
 # Cloned from Harlo (github.com/JosephOIbrahim/Harlo). Specialized for Hanna.
 """scripts/first_hanna_brief.py — smaller day-zero PoC per HANNA_BLUEPRINT.md §11.1.
 
 End-to-end: inline phase compute, one Harlo `coach` read via the bridge,
 one persisted SQLite row, one composed brief to stdout. State-blind on
-HarloUnreachable. No-op on FAMILY_LOCKOUT.
+HarloUnreachable or HarloTimeout. No-op on FAMILY_LOCKOUT.
 """
 
 from __future__ import annotations
 
 import sqlite3
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from src.harlo_bridge import HarloBridge, HarloUnreachable
+from src.computations.compute_brief_priority import compute_brief_priority
+from src.computations.compute_producer_phase import compute_producer_phase
+from src.harlo_bridge import HarloBridge, HarloTimeout, HarloUnreachable
+from src.schemas import BriefPayload, ProducerPhase, ProductFile, ProductStatus
+
+_STATUS_DISPLAY_ORDER = {
+    ProductStatus.IN_FLIGHT.value: 0,
+    ProductStatus.EXPLORING.value: 1,
+    ProductStatus.PARKED.value: 2,
+    ProductStatus.SHIPPED.value: 3,
+}
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = REPO_ROOT / "data" / "hanna.sqlite"
+PRODUCTS_DIR = REPO_ROOT / "data" / "products"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS briefs (
@@ -44,12 +42,8 @@ CREATE TABLE IF NOT EXISTS briefs (
 """
 
 
-def _phase_now() -> str:
-    et = ZoneInfo("America/New_York")
-    now = datetime.now(et)
-    if now.weekday() >= 5 or not (9 <= now.hour < 17):
-        return "FAMILY_LOCKOUT"
-    return "MORNING"
+def _phase_now() -> ProducerPhase:
+    return compute_producer_phase(datetime.now(ZoneInfo("America/New_York")), ProducerPhase.MORNING)
 
 
 def _utc_ts() -> str:
@@ -58,9 +52,9 @@ def _utc_ts() -> str:
 
 def _read_harlo() -> tuple[bool, dict | None]:
     try:
-        bridge = HarloBridge()
-        return True, bridge.drive_coaching_exchange()
-    except HarloUnreachable:
+        with HarloBridge() as bridge:
+            return True, bridge.drive_coaching_exchange()
+    except (HarloUnreachable, HarloTimeout):
         return False, None
 
 
@@ -77,28 +71,88 @@ def _extract_burnout(harlo_payload: dict | None) -> str | None:
     return burnout if isinstance(burnout, str) else None
 
 
-def _compose_brief(phase: str, harlo_reachable: bool, harlo_payload: dict | None) -> str:
+def _read_product_files() -> list[ProductFile]:
+    if not PRODUCTS_DIR.exists():
+        return []
+    products: list[ProductFile] = []
+    for path in sorted(PRODUCTS_DIR.glob("*.md")):
+        if path.name.endswith(".private.md"):
+            continue
+        products.append(ProductFile.parse(path.read_text(), path=path))
+    return products
+
+
+def _state_line(harlo_reachable: bool, harlo_payload: dict | None) -> str:
     if harlo_reachable:
         burnout = _extract_burnout(harlo_payload)
-        state_line = (
-            f"Harlo edge reachable; burnout reads **{burnout}**."
-            if burnout
-            else "Harlo edge reachable; coaching context in hand."
-        )
-    else:
-        state_line = (
-            "Harlo edge unreachable — Hanna is operating **state-blind**. "
-            "No cognitive snapshot was read; nothing about Joe's state is being inferred."
-        )
-    return (
-        f"# Hanna brief — {phase.lower()}\n\n"
-        f"Across the portfolio you have several threads in flight and a small "
-        f"handful approaching their next checkpoint. Nothing is on fire; nothing "
-        f"is silent either. The shape of the day is steady. {state_line}\n\n"
-        f"Approaching this morning: the open lanes from yesterday's session are "
-        f"still where you left them, and the next forcing function on the horizon "
-        f"is days out rather than hours. Surfacing this as observation — the call "
-        f"on what to pick up first is yours."
+        if burnout:
+            return f"Harlo edge reachable; burnout reads **{burnout}**."
+        return "Harlo edge reachable; coaching context in hand."
+    return "Harlo edge unreachable — Hanna is operating **state-blind**."
+
+
+def _portfolio_line(ranked: list[str], by_name: dict[str, ProductFile], phase: ProducerPhase) -> str:
+    if not ranked:
+        return "The portfolio surface is empty — no product state has been logged yet."
+    top_name = ranked[0]
+    top_status = by_name[top_name].status.value.replace("_", " ")
+    counts = Counter(by_name[name].status.value for name in ranked)
+    ordered = sorted(counts.items(), key=lambda kv: _STATUS_DISPLAY_ORDER.get(kv[0], 99))
+    breakdown = ", ".join(f"{count} {status.replace('_', ' ')}" for status, count in ordered)
+    return f"Across the portfolio: {breakdown}. Today's top read is **{top_name}** ({top_status})."
+
+
+def _approaching_line(ranked: list[str], by_name: dict[str, ProductFile]) -> str:
+    entries: list[tuple[str, str, str]] = []
+    for name in ranked:
+        product = by_name.get(name)
+        if product is None:
+            continue
+        for ff in product.approaching:
+            if ff.date_iso or ff.description:
+                entries.append((ff.date_iso, ff.description, name))
+    if not entries:
+        return ""
+    entries.sort(key=lambda triple: (triple[0] or "9999-99-99", triple[2]))
+    pieces = [f"{date_iso} — {description} ({name})" for date_iso, description, name in entries[:3]]
+    return f"Approaching: {'; '.join(pieces)}. "
+
+
+def _blockers_line(ranked: list[str], by_name: dict[str, ProductFile]) -> str:
+    pieces: list[str] = []
+    for name in ranked:
+        product = by_name.get(name)
+        if product is None:
+            continue
+        for blocker in product.blockers:
+            pieces.append(f"{name}: {blocker}")
+    if not pieces:
+        return ""
+    return f"Blockers: {'; '.join(pieces)}. "
+
+
+def _compose_brief(phase: ProducerPhase, harlo_reachable: bool, harlo_payload: dict | None) -> BriefPayload:
+    products = _read_product_files()
+    ranked = compute_brief_priority(products, phase)
+    by_name = {p.product: p for p in products}
+    composed_at = datetime.now(timezone.utc).isoformat()
+
+    state_line = _state_line(harlo_reachable, harlo_payload)
+    portfolio_line = _portfolio_line(ranked, by_name, phase)
+    approaching_line = _approaching_line(ranked, by_name)
+    blockers_line = _blockers_line(ranked, by_name)
+
+    body = (
+        f"# Hanna brief — {phase.name.lower()}\n\n"
+        f"{portfolio_line} {state_line}\n\n"
+        f"{approaching_line}{blockers_line}"
+        f"Surfacing this as observation — the call on what to pick up first is yours."
+    )
+    return BriefPayload(
+        phase=phase,
+        composed_at_iso=composed_at,
+        body_markdown=body,
+        referenced_products=list(ranked),
     )
 
 
@@ -115,14 +169,14 @@ def _persist(ts: str, phase: str, body: str, harlo_reachable: bool) -> None:
 
 def main() -> int:
     phase = _phase_now()
-    if phase == "FAMILY_LOCKOUT":
+    if phase == ProducerPhase.FAMILY_LOCKOUT:
         print("Hanna paused: FAMILY_LOCKOUT (Mon–Fri 09:00–17:00 ET).")
         return 0
 
     harlo_reachable, harlo_payload = _read_harlo()
-    body = _compose_brief(phase, harlo_reachable, harlo_payload)
-    _persist(_utc_ts(), phase, body, harlo_reachable)
-    print(body)
+    brief = _compose_brief(phase, harlo_reachable, harlo_payload)
+    _persist(brief.composed_at_iso, phase.name.lower(), brief.body_markdown, harlo_reachable)
+    print(brief.body_markdown)
     return 0
 
 

@@ -38,3 +38,7 @@ twin.db
 twin.db-*
 *.log
 NEXT.local.md
+
+# Hanna PoC + product file artifacts
+data/*.sqlite
+data/products/*.private.md

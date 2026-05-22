@@ -16,8 +16,6 @@
 # Desktop access
 #   Option A — Alias: right-click this file →
 #              Make Alias → drag the alias to Desktop
-#   Option B — .app:  see bin/README.md for Script Editor
-#              wrapper instructions
 # ──────────────────────────────────────────────────────────
 
 set -e
