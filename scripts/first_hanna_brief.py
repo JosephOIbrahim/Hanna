@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sqlite3
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -17,7 +18,14 @@ from zoneinfo import ZoneInfo
 from src.computations.compute_brief_priority import compute_brief_priority
 from src.computations.compute_producer_phase import compute_producer_phase
 from src.harlo_bridge import HarloBridge, HarloUnreachable
-from src.schemas import BriefPayload, ProducerPhase, ProductFile
+from src.schemas import BriefPayload, ProducerPhase, ProductFile, ProductStatus
+
+_STATUS_DISPLAY_ORDER = {
+    ProductStatus.IN_FLIGHT.value: 0,
+    ProductStatus.EXPLORING.value: 1,
+    ProductStatus.PARKED.value: 2,
+    ProductStatus.SHIPPED.value: 3,
+}
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = REPO_ROOT / "data" / "hanna.sqlite"
@@ -87,19 +95,11 @@ def _portfolio_line(ranked: list[str], by_name: dict[str, ProductFile], phase: P
     if not ranked:
         return "The portfolio surface is empty — no product state has been logged yet."
     top_name = ranked[0]
-    top_status = by_name[top_name].status.value
-    n = len(ranked)
-    if n == 1:
-        return (
-            f"Across the portfolio, 1 thread is in flight. Today's top read is "
-            f"**{top_name}** ({top_status})."
-        )
-    others = n - 1
-    others_phrase = "1 other follows" if others == 1 else f"{others} others follow"
-    return (
-        f"Across the portfolio, {n} threads are in flight. Today's top read is "
-        f"**{top_name}** ({top_status}); {others_phrase}."
-    )
+    top_status = by_name[top_name].status.value.replace("_", " ")
+    counts = Counter(by_name[name].status.value for name in ranked)
+    ordered = sorted(counts.items(), key=lambda kv: _STATUS_DISPLAY_ORDER.get(kv[0], 99))
+    breakdown = ", ".join(f"{count} {status.replace('_', ' ')}" for status, count in ordered)
+    return f"Across the portfolio: {breakdown}. Today's top read is **{top_name}** ({top_status})."
 
 
 def _approaching_line(ranked: list[str], by_name: dict[str, ProductFile]) -> str:
