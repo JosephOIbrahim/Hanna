@@ -23,7 +23,7 @@ flowchart LR
     Hanna["Hanna<br/>producer-rhythm twin"]:::primary
     Harlo["Harlo<br/>cognitive-state twin"]:::secondary
     Octavius["Octavius<br/>multi-agent execution"]:::secondary
-    Stage[("/hanna/* stage")]:::secondary
+    Stage[("data/hanna.sqlite<br/>(SQLite tables per D008.2/3)")]:::secondary
 
     Joe -->|"directs"| Hanna
     Hanna -->|"read-only<br/>(state, prediction, burnout)"| Harlo
@@ -72,27 +72,27 @@ Phases outside Mon–Fri 09:00–17:00 ET resolve to `FAMILY_LOCKOUT`. Briefs an
 
 ## Family-first as architectural primitive
 
-Family time is enforced at **three independent layers**. Bypassing any layer fails CI.
+Family time is enforced at **two active layers** (Layer 2 — `HdProducer` delegate — was cut per [D008.1](docs/DECISIONS.md); layer numbering preserved for backward reference). Bypassing either layer fails CI.
 
 ```mermaid
 flowchart LR
     classDef gate   fill:#FFD166,stroke:#000000,stroke-width:2px,color:#000000
     classDef block  fill:#FF8C42,stroke:#000000,stroke-width:2px,color:#000000
+    classDef cut    fill:#D2DACE,stroke:#000000,stroke-width:2px,color:#000000,stroke-dasharray:5 5
 
     Call["MCP tool call<br/>e.g. hanna_morning_brief"]:::block
     L1{"Layer 1<br/>compute_producer_phase"}:::gate
-    L2{"Layer 2<br/>HdProducer delegate"}:::gate
+    L2{"Layer 2<br/>HdProducer delegate<br/>(Cut per D008.1)"}:::cut
     L3{"Layer 3<br/>per-tool lockout check"}:::gate
     Stop["LockoutResponse<br/>well-defined no-op"]:::block
     Out["brief · capsule · formation"]:::block
 
     Call --> L1
     L1 -->|"FAMILY_LOCKOUT"| Stop
-    L1 -->|"active phase"| L2
-    L2 -->|"lockout"| Stop
-    L2 -->|"route"| L3
+    L1 -->|"active phase"| L3
     L3 -->|"lockout"| Stop
     L3 -->|"execute"| Out
+    L2 -.->|"collapsed into L3"| L3
 ```
 
 Override exists for true exceptions — explicit `override_token`, HMAC-signed, single-use, TTL-bounded. It is a deliberate friction surface, not a flag. See [`RULES.md`](RULES.md) §34 for the full enforcement spec.
@@ -135,7 +135,7 @@ flowchart TB
     UI    -.->|"design reference for"| Channels
 ```
 
-**Day-zero deliverable:** `scripts/first_hanna_brief.py` boots Hanna, reads Joe's state from Harlo, computes producer phase, ranks brief priority across portfolio products, authors `/hanna/daily/brief` to stage, and returns the brief to stdout. *If that script runs, Hanna is real. The rest is iteration.*
+**Day-zero deliverable:** `scripts/first_hanna_brief.py` boots Hanna, reads Joe's state from Harlo, computes producer phase, ranks brief priority across portfolio products, persists the brief to `data/hanna.sqlite` (per [D008.2/3](docs/DECISIONS.md), SQLite tables replace the cut USD stage), and returns the brief to stdout. *If that script runs, Hanna is real. The rest is iteration.*
 
 ---
 
@@ -190,7 +190,7 @@ bin/
 
 Apache 2.0. See [`LICENSE`](LICENSE).
 
-Hanna's substrate is cloned from [Harlo](https://github.com/JosephOIbrahim/Harlo). Every cloned file retains its original Apache 2.0 header. [`NOTICE`](NOTICE) credits Harlo as the substrate origin.
+Hanna's substrate is cloned from [Harlo](https://github.com/JosephOIbrahim/Harlo). Cloned files carry an attribution trailer (`# Cloned from Harlo (github.com/JosephOIbrahim/Harlo). Specialized for Hanna.`) within the first 20 lines per [D003](docs/DECISIONS.md) + [D004](docs/DECISIONS.md). No per-file Apache header is added — Harlo originals carry zero per-file headers, and the clone inherits the absence; license coverage applies via the repo-root [`LICENSE`](LICENSE) (Apache 2.0) + [`NOTICE`](NOTICE) files. [`NOTICE`](NOTICE) credits Harlo as the substrate origin.
 
 ---
 

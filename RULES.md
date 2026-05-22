@@ -12,7 +12,7 @@ Producer-specific addenda follow at §34–37.
 
 **Applicability note (ratified by [D008.7](docs/DECISIONS.md) 2026-05-22):** rules reference components inherited from Harlo's substrate (e.g., Rust hot path, hippocampus FFI, ONNX encoder). Where Hanna has not yet cloned the component, **the rule is "Not yet load-bearing — applies on the session that lands the constrained component"** — not as license to skip. The substrate is the architecture, not the schedule.
 
-**Currently load-bearing rules:** Rule 18 (RED override, via the Harlo bridge's `read_burnout_level`), Rule 34 (family-first lockout, layer 1 landed in `compute_producer_phase`), Rule 35 (cross-substrate writes prohibited, gated by the Harlo bridge surface ratified in D001), Rule 36 (surface, don't decide, encoded in pure-enum returns), Rule 37 (patent topics never raised, zero exceptions). Rules 1–8, 11–17, 19–33 await their constrained components per D008.7's selective re-adoption posture.
+**Currently load-bearing rules:** Rule 18 (RED override, via the Harlo bridge's `read_burnout_level`), Rule 34 (family-first lockout — Layer 1 landed in `compute_producer_phase`; Layer 2 `HdProducer` delegate Cut per [D008.1](docs/DECISIONS.md); Layer 3 per-tool MCP gating deferred to the L6 `mcp_tools` lane per [`docs/ROADMAP.md`](docs/ROADMAP.md) §5), Rule 35 (cross-substrate writes prohibited, gated by the Harlo bridge surface ratified in D001 + hardened in [L3b](docs/ROADMAP.md) per D005), Rule 36 (surface, don't decide, encoded in pure-enum returns), Rule 37 (patent topics never raised, zero exceptions). Rules 1–8, 11–17, 19–33 await their constrained components per D008.7's selective re-adoption posture.
 
 ---
 

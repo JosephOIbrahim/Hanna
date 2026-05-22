@@ -227,12 +227,12 @@ Hanna does not:
 This is not a config flag. It is a state-machine constraint enforced at three layers:
 
 1. **`compute_producer_phase`** — returns `FAMILY_LOCKOUT` outside Mon–Fri 9–5, regardless of other inputs. No downstream surface generates briefs or formations during lockout.
-2. **`HdProducer` delegate routing** — RED-state override is inherited. `FAMILY_LOCKOUT` is the second override. Nothing routes through the delegate during lockout.
+2. ~~**`HdProducer` delegate routing**~~ — **Cut per [D008.1](docs/DECISIONS.md) 2026-05-22.** Layer 2 collapses into layer 3 (per-tool lockout check); Hanna calls Claude directly, no delegate routing needed. The lockout model is now two active layers (1 + 3).
 3. **MCP tool gating** — every tool checks lockout before executing. Lockout returns `LockoutResponse`, not an error. Calling Hanna during family time is a well-defined no-op.
 
 Override path exists for true exceptions but is a deliberate friction surface, requiring an explicit `override_token` with TTL. Not a flag.
 
-Tests verify all three layers. Bypassing any layer fails CI.
+Tests verify the two active layers (1 + 3). Bypassing either layer fails CI.
 
 ---
 
@@ -387,18 +387,18 @@ Producer-specific addendum (subject to Session 1 recon validation):
 
 - **Hanna** is a personal name, like Harlo. No backronym.
 - Files, classes, modules use `hanna_` / `Hanna` prefixes where they mirror Harlo's `harlo_` / `Harlo` patterns.
-- Stage namespace is `/hanna/*`.
-- Hydra delegate is `HdProducer` (mirrors Harlo's `HdClaude` naming where `Hd` is the Hydra delegate prefix).
+- ~~Stage namespace is `/hanna/*`.~~ **Cut per [D008.2](docs/DECISIONS.md) 2026-05-22** — persistence lives in `data/hanna.sqlite` (SQLite tables), not a USD stage.
+- ~~Hydra delegate is `HdProducer` (mirrors Harlo's `HdClaude` naming).~~ **Cut per [D008.1](docs/DECISIONS.md) 2026-05-22** — no delegate ships; Hanna calls Claude directly.
 
 ### Attribution
 
-Every cloned file retains the Apache 2.0 header and adds a line:
+Every cloned file carries an attribution trailer comment within the first 20 lines (per [D004](docs/DECISIONS.md) §A):
 
 ```python
 # Cloned from Harlo (github.com/JosephOIbrahim/Harlo). Specialized for Hanna.
 ```
 
-`NOTICE` file at repo root credits Harlo as the substrate origin.
+Per [D003](docs/DECISIONS.md), no per-file Apache header is added — Harlo originals carry zero per-file headers, and the clone inherits the absence. License coverage applies via the repo-root `LICENSE` (Apache 2.0) + `NOTICE` files; per Apache §4 the accompanying `LICENSE` + `NOTICE` is sufficient and per-file boilerplate is recommended-not-required. `NOTICE` at repo root credits Harlo as the substrate origin.
 
 ### Test discipline
 

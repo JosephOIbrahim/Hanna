@@ -1,103 +1,76 @@
 # NEXT — for tomorrow-you
 
-## 2026-05-22 session outcome
+## 2026-05-22 session outcome — post-ratification buildout (L1–L4a + L3b)
 
-Three commits landed on `claude/hanna-mcp-review-ZsorY`:
+The `/hanna-dispatch-next` harness advanced five lanes on `claude/hanna-mcp-review-ZsorY` via D002 MoE dispatches. PR [#1](https://github.com/JosephOIbrahim/Hanna/pull/1) covers the full buildout against `main`.
 
-- `3cdd516` — Rule 34 layer 1 lands (FAMILY_LOCKOUT enum return; ET tz contract; PoC SSOT consumer; bridge `with`-block).
-- `5acd00a` — D005 drafted (open) bundling three bridge-hardening sub-decisions.
-- `7d74337` — first-principles review at `docs/REVIEW_2026-05-22.md` (405 lines).
+### Lane commits (top of branch, in order)
 
-Plus, this commit lands:
+- `06effc8` — **L3b** D005 bridge hardening (composition scope + selectors-based read timeout + stderr drainer with `deque(maxlen=64)`; **+21 tests**; ROADMAP §5 atomically updated).
+- `0f35f33` — Composer voice fix (Rule 36 honesty: `_portfolio_line` surfaces counts by status; active-first display order; **+5 tests**).
+- `ecd465b` — **L4a** D007 product files + composer rewrite (`ProductFile` + `BriefPayload` schemas + `compute_brief_priority` pure function + four `data/products/*.md` stubs; **+25 tests**; ROADMAP §5).
+- `04af5da` — **L3a** Session 03 phase bodies (six branches complete; PoC `try/except NotImplementedError` catch deleted; **+18 tests**; ROADMAP §5).
+- `2f44e52` — **L2** Substrate hygiene (`pyproject.toml` + `tests/conftest.py` + `.github/workflows/ci.yml` + `.gitignore` patches; ROADMAP §5).
+- `ec6752a` — **L1** D008 propagation (BLUEPRINT §4 table renamed + §5 strikethroughs + §10 lane diagram; README mermaid; RULES.md applicability note).
+- `413e7ad` — docs+fix: CodeRabbit PR #1 review batch 1 (D001 anchors, NEXT.md status alignment, midday/evening phase fallback).
 
-- **D006 — RESOLVED.** Delivery channel for v1 briefs = dedicated `Hanna` iCloud calendar with 0-minute anchor events at rhythm times, brief body in event notes. Full reasoning at [`docs/DECISIONS.md`](docs/DECISIONS.md) D006. The 3-day behavioral test in the §12.6 default was skipped; first-principles reasoning is the substitute. Implementation lane: a future MoE dispatch at `src/channels/calendar.py` (Bridge Engineer + Brief Composer + Compliance Reviewer).
-- **D007 — RESOLVED 2026-05-22 (whole-batch).** Input surface MVS = per-product `.md` files at `data/products/{name}.md`, YAML frontmatter + named sections. Initial set: `harlo`, `octavius`, `moneta`, `comfy_cozy`. Six sub-decisions (D007.1–D007.6) ratified at their proposed defaults. Full reasoning at [`docs/DECISIONS.md`](docs/DECISIONS.md) D007.
-- **D008 — RESOLVED 2026-05-22 (whole-batch).** §4 inheritance ratification = Cut six pending items (Hydra delegate, USD stage, three-tier storage, Rust hot path, XGBoost, dual venv); Review the 33 rules (selective re-adoption as constrained components land). Seven sub-decisions (D008.1–D008.7) ratified per [`docs/DECISIONS.md`](docs/DECISIONS.md) D008.
+### Test count
 
-D006's Calendar choice corroborates D008.2 (USD Cut): Calendar IS the stage for v1. D007's input surface and D006's output channel are symmetric — both decisions favor surfaces Joe already inhabits over Hanna-authored fresh substrate.
+73 tests pass on `06effc8` (52 baseline + 21 from L3b). Up from 7/7 at Session 02 close.
 
-**Substrate-decision tree at end of session:**
-- D001 (Rule 35 permissive) — resolved
-- D002 (MoE methodology) — resolved
-- D003 (Apache headers) — resolved
-- D004 (trailer hygiene) — resolved
-- D005 (bridge hardening — rate-limit + read timeout + stderr drain) — **resolved** (whole-batch 2026-05-22)
-- D006 (Calendar channel) — resolved
-- D007 (per-product `.md` input surface MVS) — **resolved** (whole-batch 2026-05-22)
-- D008 (§4 inheritance ratification, 7 sub-decisions) — **resolved** (whole-batch 2026-05-22)
+### Substrate-decision tree at end of session
 
-**All substrate decisions resolved.** Downstream lanes unblocked:
-- D005 → MoE Dispatch #2 hardens `src/harlo_bridge.py` (rate-limit scope methods, `selectors.DefaultSelector` timeout, background stderr drainer + ring buffer).
-- D006 → MoE dispatch lands `src/channels/calendar.py` (osascript Calendar publish + archive; `BriefPayload → CalendarEventId`).
-- D007 → land `data/products/{harlo,octavius,moneta,comfy_cozy}.md` stubs + `ProductFile` schema in `src/schemas.py` + brief-composer rewrite (Path.read_text + YAML frontmatter parse + section render).
-- D008 → BLUEPRINT §4 table propagation (column rename + per-row ratified value) + §5 strike-throughs (Hydra delegate, USD stage prims) + §10 lane diagram refresh (`delegate`/`stage`/Rust crate lanes removed). Hygiene-pass commit per [`docs/REVIEW_2026-05-22.md`](docs/REVIEW_2026-05-22.md) §3.3.
+| D-entry | Status | Implementation |
+|---|---|---|
+| D001 | resolved | `src/harlo_bridge.py` permitted-tool surface (visibly compliant per D001 implications bullet 4) |
+| D002 | resolved | every MoE dispatch in this session followed the protocol |
+| D003 | resolved | clones carry trailer only; fresh seeds carry no trailer |
+| D004 | resolved | reviewer audits trailer placement within first 20 lines |
+| D005 | resolved | **landed via L3b** (`src/harlo_bridge.py` + `tests/test_harlo_bridge.py`) |
+| D006 | resolved | **pending L4b implementation** (next lane) |
+| D007 | resolved | **landed via L4a** (`src/schemas.py` `ProductFile` + `BriefPayload`; `data/products/*.md`; composer rewrite) |
+| D008 | resolved | **landed via L1** (BLUEPRINT + README + RULES docs propagation) |
+
+### ROADMAP §5 status
+
+| Lane | Status |
+|---|---|
+| L1 — D008 propagation | done |
+| L2 — Substrate hygiene | done |
+| L3a — Session 03 phase bodies | done |
+| L3b — D005 bridge hardening | done |
+| L4a — D007 product files + composer rewrite | done |
+| L4b — D006 calendar.py | queued (next) |
+| L5 — Schemas 2–5 | queued |
+| L6 — `mcp_tools` lane | queued |
+| L7 — `octavius_bridge.py` | queued |
 
 ## Where you are
 
-- Branch: `main` (HEAD = `4dcc36b`).
-- Origin: `github.com/JosephOIbrahim/Hanna` — main pushed, `session-02-scaffold` pushed for history.
-- Session 02 closed out 2026-05-20.
+- **Branch:** `claude/hanna-mcp-review-ZsorY`.
+- **PR:** [#1](https://github.com/JosephOIbrahim/Hanna/pull/1) open against `main`. CI passing on `06effc8`. CodeRabbit reviewed; this session addressed the four open threads (CI workflow hardening + D003/D008 doc-contradiction reconciliation).
+- **Branch is 14+ commits ahead of `main`.**
 
-## Session 02 receipts
+## Next session entry point — L4b
 
-- `session-02-scaffold` merged `--ff-only` into main:
-  - `e7ac833` — feat(computations): scaffold `compute_producer_phase` (Session 02).
-  - `732b676` — docs(decisions,notice): ratify D003 — drop per-file Apache headers.
-- Net line count: **90** (target ~100; cap 130).
-- Tests: **7 / 7 pass** (`Harlo/.venv314/bin/python -m pytest tests/computations/`).
-- All 7 phase branches in `src/computations/compute_producer_phase.py` raise `NotImplementedError("Session 03")`.
+L4b lands `src/channels/calendar.py` (D006 — Calendar channel implementation). It is the terminal lane of "Hanna is real" — after L4b ships, briefs land on Joe's iCloud calendar.
 
-## Decisions ratified
+MoE dispatch per D002:
 
-- **D003** — Apache header convention: clones inherit absence. NOTICE read literally; 4 files amended.
-- **D004** — Attribution-trailer hygiene at reviewer + conventions layers (commit `4dcc36b`).
-- Next decision number: **D005**.
+- **Bridge Engineer** — `src/channels/__init__.py` + `src/channels/calendar.py` with `publish(brief: BriefPayload) -> CalendarEventId | None` (returns `None` during `FAMILY_LOCKOUT` per Rule 34 gate at publish site) and `archive(event_id)`. AppleScript via `subprocess.run(["osascript", "-e", template])`. New exceptions: `HannaCalendarNotFound`, `HannaCalendarNotAvailable` (for non-macOS dev envs), `HannaCalendarPublishFailed`. Add `CalendarEventId = NewType("CalendarEventId", str)` to `src/schemas.py`. Author `tests/test_calendar.py` (≥6 mocked-subprocess tests).
+- **Brief Composer** — `src/channels/_calendar_body.py` with `format_brief_body_for_calendar(body: str, max_chars: int = 1024) -> str` truncation helper. Author `tests/test_calendar_body.py` (≥3 cases per CONVENTIONS §1).
+- **Compliance Reviewer** — D002 final-reviewer protocol. Confirm Rule 34 lockout check exists at publish call site; trailer hygiene (all three new files are fresh seeds — no Harlo ancestor — so no trailer).
+- **Integration** — main thread wires `publish()` into `scripts/first_hanna_brief.py` main() with graceful `HannaCalendarNotAvailable` handling for non-macOS environments; swaps `bin/hanna-brief.command` Phase-2 target from `open "$BRIEF_PATH"` to `python3 -m src.channels.calendar publish-now`.
 
-## Session 03 entry point
-
-**First deliverable:** implement the 7 transition bodies in `src/computations/compute_producer_phase.py`. Each branch currently raises `NotImplementedError("Session 03")`. Target mapping:
-
-| Branch condition (current code) | Returns |
-|---|---|
-| `weekday() >= 5` or `hour ∉ [work_start, work_end)` | `ProducerPhase.FAMILY_LOCKOUT` |
-| `now.day == monthly_day` | `ProducerPhase.MONTHLY` |
-| `weekday() == 0 and hour == weekly_monday_hour` | `ProducerPhase.WEEKLY_MONDAY` |
-| `weekday() == 4 and hour == weekly_friday_hour` | `ProducerPhase.WEEKLY_FRIDAY` |
-| `hour < morning_end_hour` | `ProducerPhase.MORNING` |
-| `hour < midday_end_hour` | `ProducerPhase.MIDDAY` |
-| fallthrough | `ProducerPhase.EVENING` |
-
-Then convert the 7 stubs in `tests/computations/test_compute_producer_phase.py` from `pytest.raises(NotImplementedError)` to assertions on the returned `ProducerPhase` value. Per Harlo's `tests/test_sprint1/test_cogexec.py:4` precedent (and CONVENTIONS §1), each branch wants **≥3 cases** — boundary + interior + adjacent-day-or-hour — so the test file grows to ~21+ cases.
-
-**Followups for Session 03 to surface:**
-
-- Lockout-window granularity: ET vs. UTC, holidays, half-days. If finer-grained than Mon–Fri 09–17 ET is needed, surface for D005.
-- Hanna still has no `pyproject.toml` / venv. Session 03 may want to establish one before the test suite grows; alternative is keep using Harlo's `.venv314` indefinitely.
-- `prev_phase` is currently a signature arg but unused in the spec table above. Session 03 will need to decide whether prev_phase informs the transition (e.g., hysteresis on phase flips at boundary hours) or is purely for symmetry with `compute_burst.py`'s pattern.
-
-## D005 — RESOLVED 2026-05-22 — Harlo bridge hardening (whole-batch ratification)
-
-Three latent issues in `src/harlo_bridge.py`. Two surfaced during Session 02; the third surfaced during the 2026-05-22 senior review. All three bundled into [`docs/DECISIONS.md`](docs/DECISIONS.md) D005, ratified whole-batch on 2026-05-22 at the proposed defaults. The implementation lane (MoE Dispatch #2: Bridge Engineer + Compliance Reviewer per D002) is unblocked; estimated ~50–80 lines.
-
-- **D005.1 — `_coach_driven` rate limit has the wrong shape.** [D001](docs/DECISIONS.md) mandates "≤1 `coach` call per brief composition" with the rate limit living in the bridge. The current boolean (`src/harlo_bridge.py:43, 85–89`) enforces "≤1 per `HarloBridge` instance, ever" — any long-lived caller composing more than one brief raises `HarloCoachingExchangeAlreadyDriven` on the second composition. The current PoC accidentally honors the intent by instantiating one bridge per run (now via the `with`-block landed in commit `3cdd516`). Default proposed: `begin_composition()` / `end_composition()` scope methods.
-- **D005.2 — `_read_frame` timeout is dead.** The `timeout` parameter is plumbed through `_rpc → _read_frame` but the body never references it (`src/harlo_bridge.py:175–201`). `proc.stdout.readline()` and `proc.stdout.read(content_length)` are blocking pipe reads. A hung Harlo subprocess freezes the bridge indefinitely. Day-zero PoC didn't surface this because the test paths didn't exercise hang scenarios. Default proposed: `selectors.DefaultSelector` + `select(timeout=…)`.
-- **D005.3 — stderr is undrained.** `subprocess.Popen` opens with `stderr=subprocess.PIPE` (`src/harlo_bridge.py:116`) but no thread or call reads from it. Once Harlo writes ~64KB to stderr (OS pipe-buffer default), the subprocess blocks on the next stderr write — deadlocking the bridge. Default proposed: background drainer thread + bounded ring buffer for diagnostics.
-
-All three are bridge-hardening concerns, not Rule 35 issues. Once D005 ratifies, a single MoE Dispatch #2 (Bridge Engineer + Compliance Reviewer per D002) lands the three together — estimated ~50–80 lines.
+After L4b: L5 (schemas 2–5: `OverrideToken`, `JoeStateSnapshot`, `FormationRequest`, `FormationOutput`) and L6 (`mcp_tools` lane authoring `python/hanna/mcp_server.py`) are queued.
 
 ## Open questions still parked
 
-(carried from prior NEXT)
+- **§C.2** — Octavius IPC PoC (deferred until `octavius_bridge` lane / L7).
+- **§C.3** — Harlo MCP-client precedent — **closed by L3b.** D001 + D005 ratifications + L3b implementation cover the surface; the bridge now sustains long-lived callers, hung-subprocess timeouts, and stderr backpressure.
+- **§C.4** — `LockoutResponse` shape (needed before L6 `mcp_tools` lane).
+- **§C.6** — RED override in delegate dispatch — **void per D008.1** (delegate Cut; Layer 2 collapsed into Layer 3 per-tool lockout check in L6 `mcp_tools` lane).
 
-- **§C.2** — Octavius IPC PoC (deferred until `octavius_bridge` lane).
-- **§C.3** — Harlo MCP-client precedent (partially addressed by §11.1 day-zero PoC; close out after Session 03 if no new questions surface).
-- **§C.4** — `LockoutResponse` shape (needed before `mcp_tools` lane).
-- **§C.6** — RED override in delegate dispatch (needed before `delegate` lane; ~5-min read of `Harlo/src/delegate_base.py` + `delegate_registry.py`).
+## Staleness flag — carry forward
 
-None of these block Session 03's first deliverable.
-
-## Staleness flag — still carried
-
-Session 01 `docs/SESSION_01_RECON.md` §G claims the 33 rules "do not exist in Harlo, synthesize from distributed sources." Still wrong — rules existed in `Harlo/CLAUDE.md` lines 37–194 the whole time. Session 01.5 extracted directly; no synthesis was needed.
-
-Joe's call at Session 03 start: fix §G with a correction note (one short paragraph), or leave as a session-stamped historical artifact?
+`docs/SESSION_01_RECON.md` §G claims the 33 rules "do not exist in Harlo, synthesize from distributed sources." Still wrong per Session 01.5's direct extraction from `Harlo/CLAUDE.md` lines 37–194. Joe's call: correct or leave as session-stamped historical artifact.
