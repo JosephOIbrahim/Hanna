@@ -25,12 +25,14 @@ Hanna's test tree uses **two layouts side by side**, picked per file:
 | `src/computations/compute_brief_priority.py` | mirror-tree | `tests/computations/test_compute_brief_priority.py` |
 | `src/computations/compute_forcing_function.py` | mirror-tree | `tests/computations/test_compute_forcing_function.py` |
 | `src/computations/compute_formation_readiness.py` | mirror-tree | `tests/computations/test_compute_formation_readiness.py` |
-| `src/delegate_producer.py` | mirror-tree | `tests/test_delegate_producer.py` |
+| ~~`src/delegate_producer.py`~~ | **Cut per [D008.1](DECISIONS.md)** — no delegate ships; layer 2 collapsed into layer 3 per-tool lockout | n/a |
 | `src/harlo_bridge.py` | mirror-tree | `tests/test_harlo_bridge.py` |
 | `src/octavius_bridge.py` | mirror-tree | `tests/test_octavius_bridge.py` |
 | `python/hanna/mcp_server.py` | subsystem-keyed (sprint convention) | `tests/test_mcp/test_*.py` per tool |
-| `/hanna/*` stage prim authoring | subsystem-keyed | `tests/test_stage/test_*.py` per prim group |
+| ~~`/hanna/*` stage prim authoring~~ | **Cut per [D008.2](DECISIONS.md)** — persistence is SQLite-only at `data/hanna.sqlite` | n/a |
 | Cross-layer lockout integration | subsystem-keyed | `tests/test_integration/test_lockout.py` |
+
+The two struck-through rows are preserved for historical context; if the L6 `mcp_tools` lane reorganizes the test surface, this table is re-resolved per CONVENTIONS hygiene (cite the session that ratified the new entry).
 
 ### Reasoning
 

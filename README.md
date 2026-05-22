@@ -175,14 +175,19 @@ bin/
 
 ## Status
 
-**Pre-scaffold.** Sessions 01 (recon), 01.5 (rules extraction + conventions), and the UI design adoption interstitial have shipped. Session 02 (first production code — `compute_producer_phase`) is queued. See [`NEXT.md`](NEXT.md) for the live handoff.
+The buildout is governed by [`docs/ROADMAP.md`](docs/ROADMAP.md) §5 — the lane-DAG status table that the [`/hanna-dispatch-next`](.claude/commands/hanna-dispatch-next.md) harness reads and updates atomically with each lane commit.
 
-| Session | Branch | Deliverable | State |
-| --- | --- | --- | --- |
-| 01 | `session-01-recon` | Recon observations doc | Shipped |
-| 01.5 | `session-01.5-rules` | Rules extraction + conventions + CLAUDE.md | Shipped |
-| UI interstitial | (folded into 01.5) | Phase-1 design reference + launcher | Shipped |
-| 02 | `session-02-scaffold` *(queued)* | `compute_producer_phase` clone + tests | Pending |
+| Lane | Status | Commit |
+|---|---|---|
+| L1 — D008 propagation | done | `ec6752a` |
+| L2 — Substrate hygiene | done | `2f44e52` |
+| L3a — Session 03 phase bodies | done | `04af5da` |
+| L3b — D005 bridge hardening | done | `06effc8` |
+| L4a — D007 product files + composer | done | `ecd465b` |
+| L4b — D006 calendar.py | queued (next — terminal lane of "Hanna is real") | — |
+| L5–L7 | queued downstream | — |
+
+Sessions 01 (recon), 01.5 (rules extraction + conventions), and 02 (substrate scaffold) shipped pre-buildout; their deliverables anchor the substrate. See [`NEXT.md`](NEXT.md) for the live session-state checkpoint.
 
 ---
 

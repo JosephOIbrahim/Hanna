@@ -194,7 +194,7 @@ Decision on which combination ships first: see open decision §12.7. None of the
 ### Producer UI Surface
 
 Web-rendered briefs and capsules. Static HTML mockup at
-`Hanna/web/templates/morning_brief.html` is the design source of truth.
+`web/templates/morning_brief.html` is the design source of truth.
 
 **Audit 2026-05-20:** the delivery channel itself is now an open decision (§12.6). The HTML system survives as design *reference* for any channel that has a layout — but the immediate delivery channel for v1 briefs may be iMessage, `osascript display notification`, a menubar app, or a Calendar event, none of which can host the editorial canvas. **Posture (restraint, no red, deliberate negative space, calm typography) transfers across channels. The 920px asymmetric-gutter kit does not.**
 
