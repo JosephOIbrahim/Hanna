@@ -471,6 +471,39 @@ The 33 rules are Review rather than Cut because the *posture* they encode (biolo
 
 ---
 
+### D009 — Adopt the multi-agent orchestrator framework (generalize & reuse)
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim)
+**Scope:** new root [`ORCHESTRATOR.md`](../ORCHESTRATOR.md); `.claude/agents/{planner,worker,critic,integrator}.md`; new `state/` durable layer (`beliefs.md`, `open_questions.md`); [`CLAUDE.md`](../CLAUDE.md) pointer; relationship to [D002](#d002--mixture-of-experts-agent-team-execution-model-for-substrate-level-work) and the `/hanna-dispatch-next` harness.
+
+**Decision.** Adopt a generalized multi-agent orchestrator operating manual (plan → delegate → verify → ship, with planner/worker/critic/integrator roles, a durable `state/` layer including a supersession-tracked belief layer, and formal EXIT/HALT termination) as the umbrella operating mode for multi-agent work in this repo. Two sub-choices:
+
+- **D009.1 — Generalize & reuse (not replace, not coexist).** The orchestrator is the umbrella; D002 is its role taxonomy. The generic state names are aliases for Hanna's existing files (`decisions.md`→`docs/DECISIONS.md`, `plan.md`→`docs/ROADMAP.md` §5 + the `NEXT.md` GOAL block, `checkpoint.md`→`NEXT.md`, `parked.md`→`NEXT.md` + `state/open_questions.md`) — no duplicate standing files. Only the two genuinely-new artifacts (`state/beliefs.md`, `state/open_questions.md`) are created. `/hanna-dispatch-next` becomes one workflow under the orchestrator (ORCHESTRATOR.md §8). No teardown of existing machinery.
+- **D009.2 — Separate `ORCHESTRATOR.md`.** The operating manual lives in its own root file; `CLAUDE.md` gains a pointer. The manual (how an agent behaves) stays separate from the project instructions (what Hanna is).
+
+**Reasoning.** An inventory found Hanna already implements ~70% of the framework in bespoke form — D002 roles map 1:1 to planner/worker/critic/integrator, and DECISIONS/ROADMAP/NEXT map to decisions/plan/checkpoint. The genuinely-missing piece is the belief layer, which would have made the 2026-05-22 session's repeated "done → superseded-by-deeper-review" pattern (CodeRabbit rounds 1→2→3; the frame-coalescing bug) visible instead of silent. Generalize & reuse captures that value with the least churn; the adapter mapping avoids the dual-system tax of "coexist" and the teardown risk of "replace."
+
+**Implications.**
+- 7 files created (ORCHESTRATOR.md, state/beliefs.md, state/open_questions.md, 4 `.claude/agents/*.md`); CLAUDE.md gains an Orchestration pointer block; this D009 entry ratifies it.
+- The belief layer is single-writer (orchestrator only); subagents propose deltas in summaries.
+- `state/beliefs.md` + `state/open_questions.md` are tracked (committed) — the audit trail is the artifact.
+- First live GOAL (L4b) is a follow-up invocation, not part of this setup.
+
+**Rejected alternatives.**
+- **Replace & migrate** — retire `/hanna-dispatch-next`, move ROADMAP/DECISIONS/NEXT into a fresh `state/` layer. Rejected: high churn, risks losing the buildout harness's proven value, and re-litigates D002.
+- **Coexist separately** — orchestrator parallel to the harness for non-lane work. Rejected: two orchestration systems duplicate concepts and invite drift.
+- **Merge the manual into `CLAUDE.md`** — rejected: mixes operating-manual and project-instruction concerns; larger blast radius on the canonical project file.
+- **Global `~/.claude/CLAUDE.md`** — rejected: over-broad; this orchestrator is adopted for Hanna, not all projects.
+
+**Related.**
+- [D002](#d002--mixture-of-experts-agent-team-execution-model-for-substrate-level-work) — the role taxonomy this orchestrator formalizes as Claude Code primitives.
+- [D003](#d003--apache-header-convention-clones-inherit-absence) / [D004](#d004--attribution-trailer-hygiene-at-reviewer-and-conventions-layers) — trailer hygiene inherited by every delegation (ORCHESTRATOR.md §9).
+- [`ORCHESTRATOR.md`](../ORCHESTRATOR.md) §7 (Hanna State Adapter), §8 (relationship to the harness), §9 (hard-constraint inheritance).
+
+---
+
 ## End of decisions log
 
-Next decision number: **D009**.
+Next decision number: **D010**.
