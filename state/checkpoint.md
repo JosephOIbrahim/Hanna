@@ -22,10 +22,10 @@ UPDATED:          2026-05-25 (scout dispatch)
 | scout-architecture | critic/red_team | **complete** (4 MAJOR; 4 belief-delta proposals; 3 open questions) |
 | scout-code-quality | critic/red_team | **complete** (0 BLOCKER, 1 MAJOR — ProductFile.parse silent-coercion gaps; frame-coalescing race-free; 5 belief-delta proposals; 3 open questions) |
 | scout-tests | critic/red_team | **complete** (3 BLOCKER — no frame-coalescing regression test; PoC 75% untested; MONTHLY-beats-WEEKLY precedence undocumented+untested; 9 MAJOR, 12 MINOR; suggests raising c003 confidence; 3 belief-delta proposals) |
-| scout-docs | critic/red_team | in-flight |
+| scout-docs | critic/red_team | **complete** (3 BLOCKER — RULES.md §34 3-layer drift; README layout map one-third-true; SESSION_01 §G claim still wrong; 8 MAJOR incl. model-id in REVIEW_2026-05-22.md + cross-verifies state/plan.md §7 violation; 6 MINOR; 4 belief-delta proposals) |
 | scout-ops | critic/red_team | in-flight |
 | scout-security-rules | critic/red_team | **complete** (2 BLOCKER — RULES.md greps target non-existent paths + missing 3-layer lockout test; 3 MAJOR incl. SQLite no PRAGMA; 4 MINOR; lock discipline on _rpc sound; 5 belief-delta proposals) |
-| scout-lanes-schemas | critic/red_team | in-flight |
+| scout-lanes-schemas | critic/red_team | **complete** (3 BLOCKER — osascript+CI platform mismatch; rhythm-anchor vs compose-moment contradiction; publish-now CLI unspecified; 8 MAJOR; 7 MINOR; 5 belief-delta proposals; observation: L4b is the only ship-able lane from HEAD) |
 
 ## Phase
 
