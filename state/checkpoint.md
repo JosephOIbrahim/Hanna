@@ -21,10 +21,10 @@ UPDATED:          2026-05-25 (scout dispatch)
 |---|---|---|
 | scout-architecture | critic/red_team | **complete** (4 MAJOR; 4 belief-delta proposals; 3 open questions) |
 | scout-code-quality | critic/red_team | **complete** (0 BLOCKER, 1 MAJOR — ProductFile.parse silent-coercion gaps; frame-coalescing race-free; 5 belief-delta proposals; 3 open questions) |
-| scout-tests | critic/red_team | in-flight |
+| scout-tests | critic/red_team | **complete** (3 BLOCKER — no frame-coalescing regression test; PoC 75% untested; MONTHLY-beats-WEEKLY precedence undocumented+untested; 9 MAJOR, 12 MINOR; suggests raising c003 confidence; 3 belief-delta proposals) |
 | scout-docs | critic/red_team | in-flight |
 | scout-ops | critic/red_team | in-flight |
-| scout-security-rules | critic/red_team | in-flight |
+| scout-security-rules | critic/red_team | **complete** (2 BLOCKER — RULES.md greps target non-existent paths + missing 3-layer lockout test; 3 MAJOR incl. SQLite no PRAGMA; 4 MINOR; lock discipline on _rpc sound; 5 belief-delta proposals) |
 | scout-lanes-schemas | critic/red_team | in-flight |
 
 ## Phase
