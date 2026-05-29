@@ -19,8 +19,8 @@ UPDATED:          2026-05-25 (scout dispatch)
 
 | TASK_ID | ROLE/MODE | Status |
 |---|---|---|
-| scout-architecture | critic/red_team | in-flight |
-| scout-code-quality | critic/red_team | in-flight |
+| scout-architecture | critic/red_team | **complete** (4 MAJOR; 4 belief-delta proposals; 3 open questions) |
+| scout-code-quality | critic/red_team | **complete** (0 BLOCKER, 1 MAJOR — ProductFile.parse silent-coercion gaps; frame-coalescing race-free; 5 belief-delta proposals; 3 open questions) |
 | scout-tests | critic/red_team | in-flight |
 | scout-docs | critic/red_team | in-flight |
 | scout-ops | critic/red_team | in-flight |
