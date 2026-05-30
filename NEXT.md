@@ -89,6 +89,6 @@ After L4b: L5 (schemas 2–5: `OverrideToken`, `JoeStateSnapshot`, `FormationReq
 - **Deeper review catches what your own confidence misses.** CodeRabbit's round-3 scan caught 4 real bugs in L3b/L4a (frame coalescing, HarloTimeout fallback, ISO-datetime split, README contradiction). All 4 were latent — passing tests + my self-audit didn't surface them.
 - **Doc-drift accumulates faster than code-drift.** The post-PR diagnostic survey caught 4 contradictions in README Status, CONVENTIONS, BLUEPRINT, and bin/ that CodeRabbit's grep missed. Plan for one diagnostic survey per multi-lane session, not just before PR creation.
 
-## Staleness flag — carry forward
+## Staleness flag — resolved 2026-05-25
 
-`docs/SESSION_01_RECON.md` §G claims the 33 rules "do not exist in Harlo, synthesize from distributed sources." Still wrong per Session 01.5's direct extraction from `Harlo/CLAUDE.md` lines 37–194. Joe's call: correct or leave as session-stamped historical artifact.
+`docs/SESSION_01_RECON.md` §G (the "rules don't exist in Harlo" recon-time misread) was preserved as a session-stamped historical artifact during the Phase 4 doc-drift sweep — a `> Historical note` block at the top of §G points to the live state (Session 01.5's direct extraction from `Harlo/CLAUDE.md` lines 37–194). The narrative below the note stays unedited as the recon-time record. q003 / q009 closed.

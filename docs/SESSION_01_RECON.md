@@ -263,6 +263,10 @@ Concretely: one module, one test file, one schemas update (one new enum, mirrori
 
 ## §G — Rules inheritance plan (resolution of blocker #1)
 
+> **Historical note (2026-05-25, Phase 4 doc-drift sweep):** This section's premise — that Harlo's rules live distributed across CLAUDE.md, design/verify docs, and inline `Commandment N` references — was wrong. The 33 inviolable rules existed verbatim in `Harlo/CLAUDE.md` lines 37–194 throughout Session 01. Session 01.5 extracted them directly from that source into `RULES.md` (no Phase-1-extraction-from-distributed-sources was needed). The "Forge Commandments" cataloged below are a separate, parallel discipline layer in Harlo, not the Hanna-inherited rules. §G is preserved unedited below as a session-stamped historical artifact per `state/open_questions.md` q003 / q009; the prose is the recon-time misread, not the live state.
+
+---
+
 Joe selected path #2: rules live distributed across Harlo's `CLAUDE.md`, the design/verify docs, and the inline-`Commandment N` references in source. Recon survey:
 
 - **12 distinct Forge Commandments** referenced (`Commandment 1` through `Commandment 12`), surfaced in `CHANGELOG.md`, six `design/mile_2_phase_*.md` files, four `verify/mile_*_crucible.md` files, and inline at `src/computations/compute_momentum.py:5,41`, `src/cognitive_stage.py:6-9`, plus several other source files. These read as **architect-acting-as-scout discipline rules** — phase ordering, verification gates, retry budgets, subprocess isolation, casing conventions. They are not 33.

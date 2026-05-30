@@ -210,13 +210,13 @@ S8. **SINCERITY GATE:** User responses classified as sincere/sarcastic/
 
 ### Rule 34 — Family-first lockout
 
-Family hours (Mon–Fri 09:00–17:00 inverse, i.e. evenings + weekends) are a structural constraint, not a setting. Enforced at three layers:
+Family hours (Mon–Fri 09:00–17:00 inverse, i.e. evenings + weekends) are a structural constraint, not a setting. Enforced at **two active layers** (Layer 2 was Cut per [D008.1](docs/DECISIONS.md); layer numbering preserved for backward reference):
 
 1. **State machine (`compute_producer_phase`):** returns `FAMILY_LOCKOUT` outside Mon–Fri 09:00–17:00, regardless of other inputs. No downstream surface generates briefs or formations during lockout.
-2. **Delegate routing (`HdProducer`):** RED-state override is inherited from Rule 18. `FAMILY_LOCKOUT` is the second override. Nothing routes through the delegate during lockout.
-3. **MCP tool gating:** every Hanna MCP tool checks lockout before executing. Lockout returns a structured `LockoutResponse`, not an error. Calling Hanna during family time is a well-defined no-op.
+2. ~~**Delegate routing (`HdProducer`):**~~ **Cut per [D008.1](docs/DECISIONS.md).** Hanna calls Claude directly with no delegate routing; this layer collapses into Layer 3 (per-tool lockout).
+3. **MCP tool gating:** every Hanna MCP tool checks lockout before executing. Lockout returns a structured `LockoutResponse`, not an error. Calling Hanna during family time is a well-defined no-op. *Currently deferred to the L6 `mcp_tools` lane per [`docs/ROADMAP.md`](docs/ROADMAP.md) §5.*
 
-Override path exists for true exceptions: explicit `override_token` with TTL (HMAC-signed, single-use). This is a deliberate friction surface, not a flag. Tests verify all three layers. **Bypassing any layer fails CI.**
+Override path exists for true exceptions: explicit `override_token` with TTL (HMAC-signed, single-use). This is a deliberate friction surface, not a flag. Tests verify the two active layers; the layer-3 test scaffold lands with L6. **Bypassing any active layer fails CI.**
 
 ### Rule 35 — Cross-substrate writes prohibited
 
