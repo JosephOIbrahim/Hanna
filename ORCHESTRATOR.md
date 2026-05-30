@@ -294,18 +294,22 @@ a pointer-of-a-pointer drifts. Only the two genuinely-new artifacts live under `
 
 | Generic name | Hanna home | Notes |
 |---|---|---|
-| `plan.md` | `docs/ROADMAP.md` §5 (task graph) + the GOAL block at the top of `NEXT.md` | ROADMAP §5 is the lane DAG + status; the GOAL/EXIT_CRITERIA/CONFIDENCE_THRESHOLD header is emitted into NEXT.md at session top |
-| `checkpoint.md` | `NEXT.md` | Field crosswalk: LAST_TASK ← lane commits; NEXT_TASK ← "Next session entry point"; OPEN_ISSUES ← "Open questions still parked"; EXIT_STATUS ← ROADMAP §5 done/queued; TOKENS_USED/BUDGET ← a new field added to NEXT.md when a live GOAL runs |
+| `plan.md` | `docs/ROADMAP.md` §5 (task graph) + the GOAL block at the top of `NEXT.md` — **OR** a per-GOAL `state/plan.md` for GOALs that don't fit ROADMAP §5 (research, cross-cutting reviews) | The adapter applies to buildout-lane GOALs. For non-lane GOALs, `state/plan.md` exists as a per-GOAL runtime file with the GOAL/EXIT_CRITERIA/CONFIDENCE_THRESHOLD header; retired at GOAL termination |
+| `checkpoint.md` | `NEXT.md` (between GOALs) **OR** a per-GOAL `state/checkpoint.md` during a live GOAL | Field crosswalk (for NEXT.md): LAST_TASK ← lane commits; NEXT_TASK ← "Next session entry point"; OPEN_ISSUES ← "Open questions still parked"; EXIT_STATUS ← ROADMAP §5 done/queued; TOKENS_USED/BUDGET ← a new field added to NEXT.md when a live GOAL runs. During a live GOAL, the structured `state/checkpoint.md` is the live source of truth |
 | `decisions.md` | `docs/DECISIONS.md` | Append-only D### log; already carries rejected alternatives per entry |
 | `parked.md` | `NEXT.md` "Open questions still parked" + `state/open_questions.md` | High-leverage parked items get promoted into open_questions.md with q-IDs; low-leverage stay narrative in NEXT.md |
-| `beliefs.md` | **`state/beliefs.md`** | NEW — no prior equivalent |
-| `open_questions.md` | **`state/open_questions.md`** | NEW — formalizes NEXT.md prose into leverage-ranked q-IDs |
+| `beliefs.md` | **`state/beliefs.md`** | NEW — no prior equivalent. **Durable across GOALs.** |
+| `open_questions.md` | **`state/open_questions.md`** | NEW — formalizes NEXT.md prose into leverage-ranked q-IDs. **Durable across GOALs.** |
 | `gate.md` | `state/gate.md` | Ephemeral; written only on EXIT/HALT during a live GOAL |
 | `tasks/<id>/` | `state/tasks/<id>/` | Ephemeral; per-task diff/review/test artifacts during a live GOAL |
 
 **Rule:** where a Hanna home exists, the generic name is an alias documented here — never a
-standing duplicate file. `state/` contains exactly `beliefs.md` and `open_questions.md` until a
-live GOAL writes ephemeral `gate.md` / `tasks/`.
+standing duplicate file. **At rest (between GOALs), `state/` contains exactly `beliefs.md` +
+`open_questions.md`** — the durable cross-GOAL layer. **During a live GOAL,** `state/` may
+additionally contain `plan.md`, `checkpoint.md`, `tasks/<id>/`, and on termination `gate.md`
+— the GOAL-runtime layer. The orchestrator retires runtime files at GOAL termination via the
+EXIT/HALT path (gate.md is written; runtime files may be cleaned or preserved per the
+post-GOAL housekeeping decision).
 
 ## §8 Relationship to `/hanna-dispatch-next`
 
