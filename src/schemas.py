@@ -9,7 +9,14 @@ from enum import Enum, IntEnum
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from src import _log
+
 _ET = ZoneInfo("America/New_York")
+
+# Size cap for ProductFile.parse input. Product files are small status notes
+# (frontmatter + four short sections); 64KB mirrors the stderr-ring 64-line
+# discipline and surfaces oversized inputs rather than silently consuming them.
+_PARSE_INPUT_CAP_BYTES = 65536
 
 # Per D010 phase→anchor table (ET):
 #   MORNING=09:00, MIDDAY=12:00, EVENING=17:00,
@@ -70,6 +77,8 @@ class ProductFile:
 
     @classmethod
     def parse(cls, text: str, path: Path | None = None) -> "ProductFile":
+        if len(text) > _PARSE_INPUT_CAP_BYTES:
+            raise ValueError("ProductFile.parse: input exceeds 64KB cap")
         lines = text.splitlines()
         if not lines or lines[0].strip() != "---":
             raise ValueError("ProductFile.parse: missing opening frontmatter delimiter")
@@ -88,7 +97,10 @@ class ProductFile:
             if ":" not in stripped:
                 raise ValueError(f"ProductFile.parse: malformed frontmatter line: {stripped!r}")
             key, _, value = stripped.partition(":")
-            frontmatter[key.strip()] = value.strip()
+            key_clean = key.strip()
+            if key_clean in frontmatter:
+                raise ValueError(f"ProductFile.parse: duplicate frontmatter key {key_clean!r}")
+            frontmatter[key_clean] = value.strip()
         for required in ("product", "status", "last_review_iso"):
             if required not in frontmatter:
                 raise ValueError(f"ProductFile.parse: missing frontmatter key {required!r}")
@@ -96,9 +108,21 @@ class ProductFile:
         current: str | None = None
         for line in lines[close_idx + 1:]:
             if line.startswith("## "):
-                header = line[3:].strip().lower()
-                current = _KNOWN_SECTIONS.get(header)
-                if current is not None:
+                header = line[3:].strip()
+                header_key = header.lower()
+                resolved = _KNOWN_SECTIONS.get(header_key)
+                if resolved is None:
+                    # Faithful surface (Rule 36): the parser names what it drops
+                    # rather than silently absorbing unknown headers. The body
+                    # under the unknown header is still skipped (current stays None).
+                    _log.get_logger("hanna.schemas").warning(
+                        "ProductFile.parse: unknown section %r in %s; ignored",
+                        header,
+                        str(path) if path is not None else "<inline>",
+                    )
+                    current = None
+                else:
+                    current = resolved
                     sections.setdefault(current, [])
             elif current is not None:
                 sections[current].append(line)
@@ -126,11 +150,24 @@ def _join_section(body_lines: list[str]) -> str:
 
 
 def _parse_bullets(body_lines: list[str]) -> list[str]:
+    """Return non-empty bullet contents from a section body.
+
+    Lines starting with ``- `` are treated as bullets; the marker is stripped
+    and the remainder returned. Empty-content bullets (``-`` alone, or ``- ``
+    with no payload after stripping) are dropped — the parser treats a marker
+    with no content as "no bullet here" rather than surfacing an empty string,
+    which would otherwise pollute downstream blockers/approaching lists.
+    """
     bullets: list[str] = []
     for line in body_lines:
         stripped = line.strip()
+        if stripped == "-":
+            continue
         if stripped.startswith("- "):
-            bullets.append(stripped[2:].strip())
+            content = stripped[2:].strip()
+            if not content:
+                continue
+            bullets.append(content)
     return bullets
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import FrozenInstanceError
 from datetime import date
 from pathlib import Path
@@ -155,6 +156,95 @@ last_review_iso: 2026-05-22
         # Legacy YYYY-MM-DD case still works.
         assert pf.approaching[1].date_iso == "2026-06-15"
         assert pf.approaching[1].description == "simpler date"
+
+    def test_parse_unknown_section_logs_warning(self, caplog):
+        text = """---
+product: harlo
+status: in_flight
+last_review_iso: 2026-05-22
+---
+
+## Status
+
+normal status
+
+## Wishlist
+
+- something that should be ignored
+
+## Notes
+
+normal notes
+"""
+        with caplog.at_level(logging.WARNING, logger="hanna.schemas"):
+            pf = ProductFile.parse(text)
+        # Unknown section body is still skipped (faithful-surface: drop visible,
+        # behavior unchanged), but the parser now names what it dropped.
+        assert pf.status_text == "normal status"
+        assert pf.notes == "normal notes"
+        assert any(
+            "unknown section" in record.getMessage() and "Wishlist" in record.getMessage()
+            for record in caplog.records
+        )
+
+    def test_parse_duplicate_frontmatter_key_raises(self):
+        text = """---
+product: harlo
+product: octavius
+status: in_flight
+last_review_iso: 2026-05-22
+---
+
+## Status
+"""
+        with pytest.raises(ValueError, match="duplicate frontmatter key 'product'"):
+            ProductFile.parse(text)
+
+    def test_parse_skips_empty_bullets(self):
+        text = """---
+product: harlo
+status: in_flight
+last_review_iso: 2026-05-22
+---
+
+## Blockers
+
+- real blocker
+-
+-
+- another real blocker
+
+## Approaching forcing functions
+
+-
+- 2026-06-15: real ff
+"""
+        pf = ProductFile.parse(text)
+        # Empty `-` and `- ` bullets are dropped; only real-content bullets survive.
+        assert pf.blockers == ["real blocker", "another real blocker"]
+        assert len(pf.approaching) == 1
+        assert pf.approaching[0].date_iso == "2026-06-15"
+
+    def test_parse_input_size_cap_raises(self):
+        oversized = "---\nproduct: x\nstatus: in_flight\nlast_review_iso: 2026-05-22\n---\n"
+        oversized += "x" * 70000
+        with pytest.raises(ValueError, match="exceeds 64KB cap"):
+            ProductFile.parse(oversized)
+
+    def test_parse_input_just_under_cap_succeeds(self):
+        # Sanity check: a payload under the cap parses normally — the cap is a
+        # ceiling, not a tight bound that catches realistic product files.
+        header = (
+            "---\n"
+            "product: x\n"
+            "status: in_flight\n"
+            "last_review_iso: 2026-05-22\n"
+            "---\n\n"
+            "## Notes\n\n"
+        )
+        body = "x" * (60000 - len(header))
+        pf = ProductFile.parse(header + body)
+        assert pf.product == "x"
 
 
 class TestProductStatus:

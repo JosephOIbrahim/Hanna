@@ -28,3 +28,15 @@ Output prints to terminal and appends to the log file. Exit code propagates from
 ## Platform notes
 
 Per D011, the calendar-channel and the launchd schedule are macOS-only. On Linux the bash launcher itself still runs (composer + persistence work); the .plist is inert without a launchd daemon to load it.
+
+## Data retention
+
+The `briefs` table in `data/hanna.sqlite` is append-only by design. D012 idempotency (the `brief_id` UNIQUE index, INSERT OR IGNORE) prevents duplicate rows from re-runs within the same phase window, so the table grows at most one row per scheduled phase fire.
+
+Expected volume: ~10 briefs/week × ~2KB body ≈ ~1MB/year. No active retention is configured; the corpus is small enough that the first five years fit comfortably in a single SQLite file.
+
+Future retention hook (catalogued for L6+, not implemented): a `python3 -m src vacuum --keep-days N` subcommand could DELETE briefs older than N days and then VACUUM. Surfaced here so the path is named; the actual implementation lives behind an explicit Joe ratification later.
+
+Backup posture: `data/hanna.sqlite` is gitignored. Backup belongs to whichever macOS layer Joe already trusts — iCloud Drive sync on the data directory, or Time Machine on `$HOME`. Hanna does not manage backup rotation itself.
+
+No SQLite encryption / TDE. The corpus is brief bodies, ISO timestamps, and dedup keys derived from product names — no secrets, no PII beyond the producer's own surfaced observations.

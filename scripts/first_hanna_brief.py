@@ -4,6 +4,24 @@
 End-to-end: inline phase compute, one Harlo `coach` read via the bridge,
 one persisted SQLite row, one composed brief to stdout. State-blind on
 HarloUnreachable or HarloTimeout. No-op on FAMILY_LOCKOUT.
+
+Sub-render contract
+-------------------
+Each sub-render helper (`_state_line`, `_portfolio_line`, `_approaching_line`,
+`_blockers_line`) returns a plain string that the composer joins with a space
+into the brief body. Trailing-period punctuation is caller-managed: the
+composer appends `.` periods at join boundaries inside each sub-render
+return value (see e.g. `f"Approaching: ...; {last}. "` and the period inside
+`_state_line`), and the surrounding paragraph layout is composed in
+`_compose_brief`. Sub-renders that produce an empty signal (no entries) return
+an empty string `""`; the composer's space-join then collapses cleanly.
+
+This contract is empirical — derived from the current `_compose_brief`
+template — and exists so future extensions of the composer (more lines, new
+phases) don't accidentally double-punctuate or drop separators. Anyone adding
+a new sub-render helper appends trailing punctuation inside the helper and
+returns `""` when there is nothing to surface; the composer then concatenates
+without further punctuation work.
 """
 
 from __future__ import annotations
