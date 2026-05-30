@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Hanna : MORNING brief launchd agent (macOS)
+    ============================================
+    Fires bin/hanna-brief.command Mon-Fri at 09:00 local time
+    (matches D010's MORNING phase-anchor 09:00 ET when the Mac's
+    timezone is America/New_York). One .plist per phase; this is
+    the MORNING demonstration. MIDDAY / EVENING / WEEKLY /
+    MONTHLY siblings follow the same shape.
+
+    Install:
+        cp bin/com.hanna.brief.morning.plist ~/Library/LaunchAgents/
+        # Substitute $HOME into the ProgramArguments + log paths
+        # below before loading (launchd does not expand ~).
+        launchctl load ~/Library/LaunchAgents/com.hanna.brief.morning.plist
+
+    Verify:
+        launchctl list | grep hanna
+        tail -f ~/Library/Logs/hanna-brief.stdout.log
+
+    Unload:
+        launchctl unload ~/Library/LaunchAgents/com.hanna.brief.morning.plist
+
+    Note: macOS-only per D011. On Linux dev environments the .plist
+    is inert; bin/hanna-brief.command itself still runs by hand.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hanna.brief.morning</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>/bin/bash</string>
+        <string>/Users/YOUR_USERNAME/Code/Hanna/bin/hanna-brief.command</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Weekday</key>
+            <integer>1</integer>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key>
+            <integer>2</integer>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key>
+            <integer>3</integer>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key>
+            <integer>4</integer>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key>
+            <integer>5</integer>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/YOUR_USERNAME/Library/Logs/hanna-brief.stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/YOUR_USERNAME/Library/Logs/hanna-brief.stderr.log</string>
+</dict>
+</plist>

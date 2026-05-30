@@ -24,6 +24,7 @@ _state_line = _module._state_line
 _approaching_line = _module._approaching_line
 _blockers_line = _module._blockers_line
 _compose_brief = _module._compose_brief
+_apply_pragmas = _module._apply_pragmas
 
 # Rule 36 voice: surface, don't direct. These imperatives must NEVER appear
 # in any composer sub-render output that addresses Joe.
@@ -516,3 +517,71 @@ class TestComposeBrief:
         # D010: MIDDAY anchors to 12:00 ET.
         assert "T12:00" in brief.phase_anchor_iso
         _assert_no_directives(brief.body_markdown)
+
+
+class TestApplyPragmas:
+    """Phase 5b: SQLite durability + concurrency hardening.
+
+    Verifies the four PRAGMAs the contract demands are actually applied
+    on the connection, and that _persist invokes the helper as part of
+    its connect → execute path.
+    """
+
+    def test_apply_pragmas_sets_expected_values_on_disk_connection(self, tmp_path):
+        # Use an on-disk DB so journal_mode=WAL can actually take effect
+        # (in-memory connections cannot WAL; they report "memory").
+        db_path = tmp_path / "pragma_check.sqlite"
+        with sqlite3.connect(db_path) as conn:
+            _apply_pragmas(conn)
+            (journal_mode,) = conn.execute("PRAGMA journal_mode").fetchone()
+            (busy_timeout,) = conn.execute("PRAGMA busy_timeout").fetchone()
+            (foreign_keys,) = conn.execute("PRAGMA foreign_keys").fetchone()
+            (synchronous,) = conn.execute("PRAGMA synchronous").fetchone()
+
+        # journal_mode is case-insensitive in the response; on-disk → "wal",
+        # but accept "memory" as a sentinel in case the test ever runs against
+        # an in-memory database in a future refactor.
+        assert journal_mode.lower() in {"wal", "memory"}
+        assert busy_timeout == 5000
+        assert foreign_keys == 1
+        # synchronous=NORMAL is integer 1 in SQLite's enum
+        # (OFF=0, NORMAL=1, FULL=2, EXTRA=3).
+        assert synchronous == 1
+
+    def test_persist_applies_pragmas_via_helper(self, tmp_path, monkeypatch):
+        # Wrap _apply_pragmas with a counting passthrough; _persist must
+        # call it exactly once per connection it opens.
+        call_count = {"n": 0}
+        real_apply = _module._apply_pragmas
+
+        def _counting_apply(conn):
+            call_count["n"] += 1
+            real_apply(conn)
+
+        monkeypatch.setattr(_module, "_apply_pragmas", _counting_apply)
+
+        db_path = tmp_path / "persist_pragma.sqlite"
+        anchor = BriefPayload.compute_phase_anchor_iso(
+            ProducerPhase.MORNING,
+            __import__("datetime").date(2026, 5, 22),
+        )
+        brief_id = BriefPayload.compute_brief_id(
+            ProducerPhase.MORNING, anchor, ["harlo"]
+        )
+        brief = BriefPayload(
+            phase=ProducerPhase.MORNING,
+            composed_at_iso="2026-05-22T09:00:00-04:00",
+            body_markdown="# morning",
+            referenced_products=["harlo"],
+            phase_anchor_iso=anchor,
+            brief_id=brief_id,
+        )
+        _persist(brief, harlo_reachable=True, db_path=db_path)
+
+        assert call_count["n"] == 1
+        # Round-trip: the row landed AND the PRAGMAs took effect on the file.
+        with sqlite3.connect(db_path) as conn:
+            (count,) = conn.execute("SELECT COUNT(*) FROM briefs").fetchone()
+            (journal_mode,) = conn.execute("PRAGMA journal_mode").fetchone()
+        assert count == 1
+        assert journal_mode.lower() == "wal"

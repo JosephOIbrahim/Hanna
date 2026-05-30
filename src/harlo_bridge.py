@@ -18,6 +18,10 @@ import time
 from types import TracebackType
 from typing import Any
 
+from src._log import get_logger
+
+logger = get_logger("hanna.bridge")
+
 
 class HarloUnreachable(RuntimeError):
     """Subprocess failed to spawn, exited, or did not respond in time."""
@@ -148,6 +152,7 @@ class HarloBridge:
         args: dict[str, Any] = {}
         if session_id is not None:
             args["session_id"] = session_id
+        logger.debug("harlo coach call session_id=%s", session_id)
         return self._call_tool("coach", **args)
 
     def drive_coaching_exchange(self, session_id: str | None = None) -> dict:
@@ -172,6 +177,19 @@ class HarloBridge:
 
     def last_stderr(self) -> list[str]:
         return list(self._stderr_ring)
+
+    def _log_stderr_tail(self, where: str) -> None:
+        """Surface the last 10 stderr lines from Harlo at lane-boundary failures.
+
+        c011 named these as collected-but-unread diagnostic data. This helper
+        is the read-and-surface site. Rule 36 voice: surface, don't decide.
+        """
+        tail = list(self._stderr_ring)[-10:]
+        if not tail:
+            logger.warning("harlo stderr empty at %s (no diagnostic lines captured)", where)
+            return
+        for line in tail:
+            logger.warning("harlo stderr [%s]: %s", where, line)
 
     def _start_drainer(self) -> None:
         if self._proc is None or self._proc.stderr is None:
@@ -215,7 +233,17 @@ class HarloBridge:
                 bufsize=0,
             )
         except (FileNotFoundError, OSError) as e:
+            logger.warning(
+                "harlo subprocess spawn failed cmd=%s err=%s",
+                self._command,
+                e,
+            )
             raise HarloUnreachable(f"failed to spawn Harlo subprocess {self._command!r}: {e}") from e
+        logger.info(
+            "harlo subprocess spawned pid=%s cmd=%s",
+            self._proc.pid,
+            self._command,
+        )
         self._start_drainer()
         self._rpc("initialize", {
             "protocolVersion": "2025-06-18",
@@ -259,9 +287,9 @@ class HarloBridge:
             proc = self._ensure_proc()
             self._write_frame(proc, {"jsonrpc": "2.0", "method": method, "params": params})
 
-    @staticmethod
-    def _write_frame(proc: subprocess.Popen[bytes], message: dict) -> None:
+    def _write_frame(self, proc: subprocess.Popen[bytes], message: dict) -> None:
         if proc.stdin is None:
+            self._log_stderr_tail("_write_frame:no-stdin")
             raise HarloUnreachable("Harlo subprocess has no stdin")
         body = json.dumps(message).encode("utf-8")
         header = f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
@@ -269,6 +297,7 @@ class HarloBridge:
             proc.stdin.write(header + body)
             proc.stdin.flush()
         except (BrokenPipeError, OSError) as e:
+            self._log_stderr_tail("_write_frame:io")
             raise HarloUnreachable(f"failed to write frame to Harlo: {e}") from e
 
     def _read_frame(self, proc: subprocess.Popen[bytes], timeout: float | None = None) -> dict:
@@ -287,6 +316,7 @@ class HarloBridge:
         while True:
             line = proc.stdout.readline()
             if not line:
+                logger.warning("harlo stdout closed before frame (blocking read)")
                 raise HarloUnreachable("Harlo subprocess closed stdout before sending a frame")
             line = line.rstrip(b"\r\n")
             if not line:
@@ -300,6 +330,11 @@ class HarloBridge:
             raise HarloProtocolError("frame missing Content-Length header")
         body = proc.stdout.read(content_length)
         if len(body) != content_length:
+            logger.warning(
+                "harlo short body read (blocking): expected=%d got=%d",
+                content_length,
+                len(body),
+            )
             raise HarloUnreachable(f"short read: expected {content_length} bytes, got {len(body)}")
         try:
             return json.loads(body.decode("utf-8"))
@@ -313,6 +348,7 @@ class HarloBridge:
         try:
             fd = proc.stdout.fileno()
         except (AttributeError, OSError) as e:
+            self._log_stderr_tail("_read_frame:no-fd")
             raise HarloUnreachable(f"Harlo stdout has no usable fd: {e}") from e
         sel.register(proc.stdout, selectors.EVENT_READ)
         try:
@@ -327,17 +363,27 @@ class HarloBridge:
             while header_end < 0:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
+                    logger.warning(
+                        "harlo timeout reading frame headers deadline=%.3fs", timeout
+                    )
+                    self._log_stderr_tail("_read_frame:headers-timeout")
                     raise HarloTimeout(f"Harlo did not send frame headers within {timeout}s")
                 ready = sel.select(timeout=remaining)
                 if not ready:
+                    logger.warning(
+                        "harlo timeout reading frame headers deadline=%.3fs", timeout
+                    )
+                    self._log_stderr_tail("_read_frame:headers-timeout")
                     raise HarloTimeout(f"Harlo did not send frame headers within {timeout}s")
                 try:
                     chunk = os.read(fd, 4096)
                 except (BlockingIOError, InterruptedError):
                     continue
                 except OSError as e:
+                    self._log_stderr_tail("_read_frame:headers-oserror")
                     raise HarloUnreachable(f"failed to read from Harlo stdout: {e}") from e
                 if not chunk:
+                    self._log_stderr_tail("_read_frame:headers-eof")
                     raise HarloUnreachable("Harlo subprocess closed stdout before sending a frame")
                 buf.extend(chunk)
                 header_end = buf.find(b"\r\n\r\n")
@@ -360,17 +406,29 @@ class HarloBridge:
             while len(body) < content_length:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
+                    logger.warning(
+                        "harlo timeout reading frame body deadline=%.3fs need=%d have=%d",
+                        timeout, content_length, len(body),
+                    )
+                    self._log_stderr_tail("_read_frame:body-timeout")
                     raise HarloTimeout(f"Harlo did not send frame body within {timeout}s")
                 ready = sel.select(timeout=remaining)
                 if not ready:
+                    logger.warning(
+                        "harlo timeout reading frame body deadline=%.3fs need=%d have=%d",
+                        timeout, content_length, len(body),
+                    )
+                    self._log_stderr_tail("_read_frame:body-timeout")
                     raise HarloTimeout(f"Harlo did not send frame body within {timeout}s")
                 try:
                     chunk = os.read(fd, content_length - len(body))
                 except (BlockingIOError, InterruptedError):
                     continue
                 except OSError as e:
+                    self._log_stderr_tail("_read_frame:body-oserror")
                     raise HarloUnreachable(f"failed to read from Harlo stdout: {e}") from e
                 if not chunk:
+                    self._log_stderr_tail("_read_frame:body-eof")
                     raise HarloUnreachable("Harlo subprocess closed stdout mid-body")
                 body.extend(chunk)
             try:

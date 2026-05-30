@@ -15,10 +15,13 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from src._log import get_logger
 from src.computations.compute_brief_priority import compute_brief_priority
 from src.computations.compute_producer_phase import compute_producer_phase
 from src.harlo_bridge import HarloBridge, HarloTimeout, HarloUnreachable
 from src.schemas import BriefPayload, ProducerPhase, ProductFile, ProductStatus
+
+logger = get_logger("hanna.brief")
 
 # D011: catch HannaCalendarNotAvailable from L4b's future Calendar channel.
 # Until src/channels/calendar.py lands, define a local stub class so the
@@ -53,8 +56,23 @@ CREATE TABLE IF NOT EXISTS briefs (
 """
 
 
+def _apply_pragmas(conn: sqlite3.Connection) -> None:
+    """Durability + concurrency hardening for the briefs SQLite store.
+
+    PRAGMAs are idempotent — safe to re-apply on every connection. Set on each
+    new connect() because journal_mode persists per-database but the others
+    (busy_timeout, foreign_keys) are per-connection.
+    """
+    conn.execute("PRAGMA journal_mode=WAL")        # concurrent-reader safety
+    conn.execute("PRAGMA synchronous=NORMAL")      # durable for WAL, no per-commit fsync
+    conn.execute("PRAGMA busy_timeout=5000")       # 5s wait on contended locks
+    conn.execute("PRAGMA foreign_keys=ON")         # future-proof; no FKs today
+
+
 def _phase_now() -> ProducerPhase:
-    return compute_producer_phase(datetime.now(ZoneInfo("America/New_York")), ProducerPhase.MORNING)
+    phase = compute_producer_phase(datetime.now(ZoneInfo("America/New_York")), ProducerPhase.MORNING)
+    logger.info("phase=%s", phase.name.lower())
+    return phase
 
 
 def _utc_ts() -> str:
@@ -62,10 +80,23 @@ def _utc_ts() -> str:
 
 
 def _read_harlo() -> tuple[bool, dict | None]:
+    bridge = HarloBridge()
     try:
-        with HarloBridge() as bridge:
-            return True, bridge.drive_coaching_exchange()
-    except (HarloUnreachable, HarloTimeout):
+        with bridge:
+            payload = bridge.drive_coaching_exchange()
+            logger.info("harlo_reachable=true coach=ok")
+            return True, payload
+    except HarloUnreachable as exc:
+        tail = getattr(bridge, "last_stderr", lambda: [])()
+        logger.warning("harlo_reachable=false reason=unreachable detail=%s", exc)
+        for line in tail[-10:]:
+            logger.warning("harlo stderr [_read_harlo:unreachable]: %s", line)
+        return False, None
+    except HarloTimeout as exc:
+        tail = getattr(bridge, "last_stderr", lambda: [])()
+        logger.warning("harlo_reachable=false reason=timeout detail=%s", exc)
+        for line in tail[-10:]:
+            logger.warning("harlo stderr [_read_harlo:timeout]: %s", line)
         return False, None
 
 
@@ -143,6 +174,7 @@ def _blockers_line(ranked: list[str], by_name: dict[str, ProductFile]) -> str:
 
 
 def _compose_brief(phase: ProducerPhase, harlo_reachable: bool, harlo_payload: dict | None) -> BriefPayload:
+    logger.info("compose start phase=%s harlo_reachable=%s", phase.name.lower(), harlo_reachable)
     products = _read_product_files()
     ranked = compute_brief_priority(products, phase)
     by_name = {p.product: p for p in products}
@@ -164,6 +196,12 @@ def _compose_brief(phase: ProducerPhase, harlo_reachable: bool, harlo_payload: d
     phase_anchor_iso = BriefPayload.compute_phase_anchor_iso(phase, compose_date)
     # D012: derive idempotency key from phase + anchor day + product set.
     brief_id = BriefPayload.compute_brief_id(phase, phase_anchor_iso, list(ranked))
+    logger.info(
+        "compose done phase=%s brief_id=%s products=%d",
+        phase.name.lower(),
+        brief_id or "(none)",
+        len(ranked),
+    )
     return BriefPayload(
         phase=phase,
         composed_at_iso=composed_at,
@@ -179,6 +217,7 @@ def _persist(brief: BriefPayload, harlo_reachable: bool, db_path: Path | None = 
     target = db_path if db_path is not None else DB_PATH
     target.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(target) as conn:
+        _apply_pragmas(conn)
         conn.execute(SCHEMA)
         conn.execute(
             "INSERT OR IGNORE INTO briefs "
@@ -199,12 +238,19 @@ def _persist(brief: BriefPayload, harlo_reachable: bool, db_path: Path | None = 
 def main() -> int:
     phase = _phase_now()
     if phase == ProducerPhase.FAMILY_LOCKOUT:
+        logger.info("main exit=0 reason=family_lockout")
         print("Hanna paused: FAMILY_LOCKOUT (Mon–Fri 09:00–17:00 ET).")
         return 0
 
     harlo_reachable, harlo_payload = _read_harlo()
     brief = _compose_brief(phase, harlo_reachable, harlo_payload)
     _persist(brief, harlo_reachable)
+    logger.info(
+        "persist done phase=%s brief_id=%s harlo_reachable=%s",
+        brief.phase.name.lower(),
+        brief.brief_id or "(none)",
+        harlo_reachable,
+    )
     # D011: future L4b publish() may raise on non-macOS; brief stays composed + persisted,
     # exit-0 lockout-style so the SQLite row is preserved across non-mac environments.
     try:
@@ -212,6 +258,7 @@ def main() -> int:
     except HannaCalendarNotAvailable as exc:
         print(f"Calendar channel unavailable (non-mac); brief persisted only. {exc}")
     print(brief.body_markdown)
+    logger.info("main exit=0 phase=%s harlo_reachable=%s", phase.name.lower(), harlo_reachable)
     return 0
 
 
