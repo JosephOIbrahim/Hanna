@@ -659,6 +659,100 @@ The conditional ordering in [`src/computations/compute_producer_phase.py`](../sr
 
 ---
 
+### D014 — `LockoutResponse` shape: structured no-op JSON returned (not raised) from MCP tools during FAMILY_LOCKOUT
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — "ratified" SPEC of the hanna-real-arc; D014 surfaces as Line B's top proposal at DELIBERATE cycle 1; main-thread per D002 (decisions author-by-main-thread).
+**Scope:** future `python/hanna/mcp_server.py` Rule-34-layer-3 gate at every `hanna_*` MCP tool; closes [q002](../state/open_questions.md); referenced by future L6 dispatch.
+
+**Decision.** When any `hanna_*` MCP tool is invoked during `FAMILY_LOCKOUT`, the tool body **returns** a structured JSON object — it does not raise. The JSON shape:
+
+```json
+{
+  "paused": true,
+  "reason": "FAMILY_LOCKOUT",
+  "phase": "FAMILY_LOCKOUT",
+  "next_anchor_iso": "2026-05-26T09:00:00-04:00",
+  "message": "Hanna is paused outside Mon–Fri 09:00–17:00 ET.",
+  "override_path_hint": "RULES.md Rule 34 documents the override mechanism."
+}
+```
+
+Field semantics:
+- `paused: bool` — top-level boolean for renderers that surface top-level keys. Always `true` in this shape.
+- `reason: str` — `"FAMILY_LOCKOUT"` for now; future `LockoutResponse` variants may carry other reasons (e.g., `"RED_OVERRIDE"` per Rule 18 if Hanna ever exposes that).
+- `phase: str` — current `ProducerPhase` name. Lets the caller distinguish "actually lockout" from "between phases."
+- `next_anchor_iso: str` — when Hanna will be active again (per D010 phase-anchor math on the next weekday).
+- `message: str` — human-readable, Rule-36-clean, descriptive (no directives).
+- `override_path_hint: str | null` — **informational only**. Does NOT decide the `override_token` mechanism (that's q014). Just points at where to read more.
+
+The tool's MCP-side return is `success` — the tool *completed*. The JSON indicates pause; the caller decides what to render.
+
+**Reasoning.** Three rejected alternatives:
+- **Exception-with-rich-message** — raising forces the MCP client to treat the call as failure. Even with a structured exception payload, Claude Code's renderer shows a red error banner; defeats the "well-defined no-op" posture D006 promised. *Also Rule 36 risk* if the message reads directive.
+- **Decorator-injected-skip** (tool body never runs; decorator returns a sentinel) — opaque; debugging "why didn't my hanna_log work?" is hard.
+- **Exception-with-structured-payload (raise with recoverable JSON)** — conflates success path with failure path; MCP clients vary in how they surface raised exception data.
+
+Chosen: structured no-op JSON returned. The success/failure axis stays clean (`success`); the paused/active axis lives in the payload (`paused: true`). Rule 36 voice in `message`. The `paused` boolean at JSON top means *every* MCP renderer that handles top-level keys can short-circuit cleanly.
+
+scout-security-rules B-1 named "override_token openly spec-only" as a gap; D014 takes the first step toward an MCP-layer lockout that DOES respect the override path conceptually, without yet committing to the secret-storage substrate (q014).
+
+**Implications.**
+- L6's `mcp_tools` lane will land a `_lockout_response(phase, now)` helper in `python/hanna/mcp_server.py` that builds this JSON; every `hanna_*` tool wraps its body with the layer-3 gate.
+- L4b's `publish()` already returns `None` on FAMILY_LOCKOUT per D011 — `publish()` is not an MCP tool, so it returns `None` rather than this JSON. The two surfaces are different.
+- F6 (LockoutResponse rendered as an error in Claude Code) is now testable: hand a static `LockoutResponse` JSON to Claude Code via a one-line MCP test tool and observe rendering. If the renderer mishandles it, D014 reverses via a new D-entry.
+- q002 — **closed by this entry.**
+
+**Rejected alternatives** (canonical block; harness-style + Hanna-style).
+- Exception with rich message — Rule 36 risk + Claude Code renders as error.
+- Decorator-injected-skip — opaque to Joe; debuggability suffers.
+- Exception with structured payload — conflates success/failure path; renderer-dependent.
+
+**Related.**
+- [D006](#d006--delivery-channel-dedicated-hanna-icloud-calendar-with-0-minute-anchor-events) — the "well-defined no-op" posture this honors.
+- [`RULES.md`](../RULES.md) Rule 34 — the lockout rule whose Layer 3 this surface implements.
+- scout-security-rules B-1 (state/tasks/scout-security-rules/findings.md).
+- q002 — closed.
+
+---
+
+### D015 — Brief composition boundary: one composition = one MCP-tool body invocation
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — "ratified" SPEC of the hanna-real-arc; D015 surfaces as Line B's 2nd proposal at DELIBERATE cycle 1; main-thread per D002.
+**Scope:** [D001](#d001--rule-35-permissive-reading-exchange_index-advance-is-not-a-write) "≤1 coach call per brief composition" semantic; [D005.1](#d005--harlo-bridge-hardening-rate-limit--read-timeout--stderr-drain) `begin_composition()` / `end_composition()` boundary; future `python/hanna/mcp_server.py` per-tool composition wrapper; closes [q007](../state/open_questions.md).
+
+**Decision.** A **brief composition** is one invocation of one MCP tool body (or one invocation of `scripts/first_hanna_brief.py` as the day-zero PoC entry). All Harlo `coach` calls made transitively from within that body share the same composition. `begin_composition()` is called at the top of the tool body (or by `drive_coaching_exchange()` implicitly); `end_composition()` is called at the bottom in a `try` / `finally`.
+
+Nested compositions (tool A's body invokes tool B as a function call) are **errors** — `begin_composition` raises `HarloCompositionAlreadyActive` per L3b's existing semantic. Tools that need to call each other do so by *requesting* (return the request, let the orchestrator dispatch) rather than by direct invocation.
+
+**Reasoning.** D001 named the rate-limit semantic ("≤1 coach call per brief composition") but the term "composition" was operationally undefined. The L3b bridge hardening added `begin_composition()` / `end_composition()` machinery without specifying what counts as one composition. Today's PoC at `scripts/first_hanna_brief.py` happens to satisfy the rule "accidentally" — `drive_coaching_exchange()` wraps `begin/_coach/end` per invocation, and the PoC only invokes the bridge once per run.
+
+For L6's MCP tools, the natural boundary is the tool body: each MCP-tool invocation is one composition. This isolates the coach rate-limit to per-tool-call; matches D001's intent; keeps Rule 35 surface visible at the tool-body diff level (per D001 Implications bullet 4).
+
+scout-architecture flagged q007 as gating L6 dispatch. D015 closes it cleanly.
+
+**Implications.**
+- L6 `mcp_tools` will wrap every `hanna_*` tool body with `with bridge.composition():` (a new context manager on `HarloBridge` that calls `begin_composition` / `end_composition`). Nested calls raise.
+- The PoC at `scripts/first_hanna_brief.py` continues to satisfy D015 because `drive_coaching_exchange()` is one composition.
+- A future "Hanna calls Hanna" pattern (one tool's body invokes another's logic) requires factoring the shared logic into composition-agnostic helpers — NOT calling the inner tool's MCP surface directly.
+- q007 — **closed by this entry.**
+
+**Rejected alternatives.**
+- **Composition = one brief artifact** (one calendar event = one composition). Rejected — tool bodies that don't ship a brief (e.g., `hanna_log`) would have no composition scope at all.
+- **Composition = one MCP session** (start at session start, end at session end). Rejected — too coarse; sessions are long-lived and would defeat D001's per-brief rate-limit.
+- **Composition = one Harlo subprocess lifetime**. Rejected — bridge can outlive many compositions per L3b's design.
+
+**Related.**
+- [D001](#d001--rule-35-permissive-reading-exchange_index-advance-is-not-a-write) — semantic this operationalizes.
+- [D005.1](#d005--harlo-bridge-hardening-rate-limit--read-timeout--stderr-drain) — bridge machinery this fits to.
+- scout-architecture (state/tasks/scout-architecture/findings.md).
+- q007 — closed.
+
+---
+
 ## End of decisions log
 
-Next decision number: **D014**.
+Next decision number: **D016**.
