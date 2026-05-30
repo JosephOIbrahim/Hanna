@@ -620,6 +620,45 @@ The key is computed deterministically from `BriefPayload` fields; no external st
 
 ---
 
+### D013 — `compute_producer_phase` branch precedence: MONTHLY > WEEKLY_MONDAY/FRIDAY > daily phases
+
+**Status:** resolved
+**Date:** 2026-05-25 (ratified as Phase 2 of "go on everything")
+**Ratified by:** Joe (Joseph Ibrahim)
+**Scope:** [`src/computations/compute_producer_phase.py`](../src/computations/compute_producer_phase.py); [`tests/computations/test_compute_producer_phase.py`](../tests/computations/test_compute_producer_phase.py); [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) heuristic spec.
+
+**Decision.** The branch order encoded in `compute_producer_phase` — `MONTHLY → WEEKLY_MONDAY → WEEKLY_FRIDAY → MORNING → MIDDAY → EVENING` (after the FAMILY_LOCKOUT gate) — is **intentional precedence**, not incidental line ordering. Concretely:
+
+- When `now.day == monthly_day` AND `now.weekday() == 0 (Mon)` at `weekly_monday_hour`, the **MONTHLY** branch fires first and wins. The WEEKLY_MONDAY branch never runs for that timestamp.
+- Symmetric for the first-Friday-of-month at `weekly_friday_hour`: MONTHLY beats WEEKLY_FRIDAY.
+- The daily-phase branches (MORNING / MIDDAY / EVENING) fire only when none of the rarer-cadence branches matched.
+
+The conditional ordering in [`src/computations/compute_producer_phase.py`](../src/computations/compute_producer_phase.py) (lines 32, 34, 36, 38, 40, 42) is the canonical encoding of this precedence. This D-entry ratifies the existing behavior as the intended contract and the regression tests in `TestPhasePrecedence` document it.
+
+**Reasoning.** MONTHLY is rarer and more architectural than WEEKLY_MONDAY/FRIDAY — it sets a once-per-month rhythm against an otherwise weekly cadence. Collapsing MONTHLY into the weekly slot would mute the monthly cadence to **once a year** in the worst case (when day-of-month 1 happens never to land on a workday — which never actually happens at default monthly_day=1, but the principle generalizes if `monthly_day` is reconfigured). The chosen precedence preserves the monthly rhythm at the cost of one weekly slot per month getting "promoted" to a MONTHLY brief — Joe receives a MONTHLY brief on those days, not a WEEKLY one. Acceptable per the producer-rhythm priority: rarer-cadence beats more-frequent.
+
+**Implications.**
+
+- Code already encodes this precedence at [`src/computations/compute_producer_phase.py:32–42`](../src/computations/compute_producer_phase.py) — no production code change needed.
+- [`tests/computations/test_compute_producer_phase.py`](../tests/computations/test_compute_producer_phase.py) gains `TestPhasePrecedence` with 3 regression tests (first-Monday + first-Friday collision cases plus a non-collision Monday control); these are the standing audit trail for the contract.
+- The phase-machine description in [`README.md`](../README.md) and [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) should add the precedence note in the Phase 4 documentation sweep — deferred, not blocking.
+- L4b `publish()` callers can rely on the precedence: if the dispatcher hands them a `MONTHLY` brief, they don't also need to publish a WEEKLY one for the same day.
+
+**Rejected alternatives.**
+
+- **Explicit precedence tracking via `prev_phase`.** Rejected — `prev_phase` is annotated as unused at v1 per L3a (`src/computations/compute_producer_phase.py:26`) and ROADMAP §4 L3a "no hysteresis." Adding it back as a precedence mechanism reverses an explicit Cut.
+- **Merge MONTHLY into the WEEKLY_MONDAY slot on collision** (e.g., a "monthly_in_weekly" sentinel). Rejected — silences the monthly cadence behind a weekly framing; Joe loses the monthly-tempo signal.
+- **Raise on collision** (force a `PhaseCollision` exception so a caller decides). Rejected — Rule 36 violation. The producer's job is to surface, not to force a decision on Joe. The deterministic precedence is the surfacing.
+
+**Related.**
+
+- L3a commit `04af5da` — original `compute_producer_phase` landing; encodes the precedence by line order.
+- scout-tests finding B3 (Phase 2 reconnaissance) — surfaced the absent regression coverage.
+- Belief `c008` — superseded by this entry; precedence is now documented + tested.
+- [D008.7](#d008--4-inheritance-ratification-cut-six-pending-items-review-the-33-rules) — selective re-adoption of inherited rules; the prev_phase-unused stance here is a parallel "no hysteresis at v1" call.
+
+---
+
 ## End of decisions log
 
-Next decision number: **D013**.
+Next decision number: **D014**.

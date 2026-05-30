@@ -122,3 +122,32 @@ class TestComputeProducerPhase:
         assert compute_producer_phase(
             datetime(2026, 9, 1, 14, 0, tzinfo=_ET), ProducerPhase.EVENING
         ) == ProducerPhase.MONTHLY
+
+
+class TestPhasePrecedence:
+    """Documents the intentional MONTHLY > WEEKLY_MONDAY/FRIDAY > daily-phase precedence
+    encoded by the conditional ordering in compute_producer_phase (per D013).
+    When `now.day == monthly_day` AND the date is the first Monday/Friday at the weekly
+    trigger hour, MONTHLY wins. The cost is one weekly slot per month gets "promoted" to a
+    monthly brief on those days; this preserves the monthly cadence over the weekly slot."""
+
+    def test_monthly_beats_weekly_monday_on_first_monday(self):
+        # 2026-06-01 is a Monday AND day-of-month 1 (monthly_day default).
+        # At weekly_monday_hour (09:00), MONTHLY must win over WEEKLY_MONDAY.
+        assert compute_producer_phase(
+            datetime(2026, 6, 1, 9, 0, tzinfo=_ET), ProducerPhase.MORNING
+        ) == ProducerPhase.MONTHLY
+
+    def test_monthly_beats_weekly_friday_on_first_friday(self):
+        # 2026-05-01 is a Friday AND day-of-month 1 (monthly_day default).
+        # At weekly_friday_hour (16:00), MONTHLY must win over WEEKLY_FRIDAY.
+        assert compute_producer_phase(
+            datetime(2026, 5, 1, 16, 0, tzinfo=_ET), ProducerPhase.EVENING
+        ) == ProducerPhase.MONTHLY
+
+    def test_weekly_monday_fires_on_non_monthly_day(self):
+        # 2026-06-08 is a Monday but NOT day-of-month 1.
+        # WEEKLY_MONDAY fires normally at weekly_monday_hour (09:00).
+        assert compute_producer_phase(
+            datetime(2026, 6, 8, 9, 0, tzinfo=_ET), ProducerPhase.MORNING
+        ) == ProducerPhase.WEEKLY_MONDAY
