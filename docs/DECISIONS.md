@@ -504,6 +504,122 @@ The 33 rules are Review rather than Cut because the *posture* they encode (biolo
 
 ---
 
+### D010 — L4b rhythm-anchor: events land at 09:00 ET phase-anchor, not compose-moment
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — "go on everything" on PRD Phase 1
+**Scope:** [`src/schemas.py`](../src/schemas.py) `BriefPayload`; [`scripts/first_hanna_brief.py`](../scripts/first_hanna_brief.py) `main()`; [`docs/ROADMAP.md`](ROADMAP.md) §4 L4b spec; future `src/channels/calendar.py` `publish()` event-start argument.
+
+**Decision.** Calendar events authored by L4b's `publish(brief: BriefPayload)` land at the **rhythm-anchor timestamp** for the brief's phase (e.g. MORNING → 09:00 ET on the compose date), NOT at `BriefPayload.composed_at_iso` (the compose moment, which is incidental — could be 07:42, 09:13, etc.). The compose moment is preserved as `composed_at_iso` for audit / dedup but is not the event-start.
+
+Phase → anchor table (per `compute_producer_phase` boundary conventions):
+
+| Phase | Anchor (ET) |
+|---|---|
+| MORNING | 09:00 |
+| MIDDAY | 12:00 |
+| EVENING | 17:00 |
+| WEEKLY_MONDAY | 09:30 |
+| WEEKLY_FRIDAY | 16:00 |
+| MONTHLY | 09:00 (first weekday of month) |
+| FAMILY_LOCKOUT | (no publish — Rule 34 gate at publish site) |
+
+**Reasoning.** D006's posture rationale (DECISIONS.md:319) is *"context the day carries"* — an event sitting in the day-view at the rhythm time, where Joe's eye naturally lands. Compose-moment defeats this: a 07:42 ET morning brief would sit before the workday starts; a 09:13 brief would sit between calendar events. The rhythm-anchor honors the rationale; the implementation cost is a small lookup in `publish()`.
+
+scout-lanes-schemas B2 surfaced this; without D010 the L4b lane spec is incoherent with D006.
+
+**Implications.**
+- `BriefPayload` gains a `phase_anchor_iso: str` field computed at composition (orchestrator computes; composer populates).
+- `publish()` uses `brief.phase_anchor_iso` as event start; uses `brief.composed_at_iso` for audit metadata.
+- `scripts/first_hanna_brief.py` `_compose_brief()` populates `phase_anchor_iso` from the current phase + compose-date.
+- ROADMAP §4 L4b spec updated to reference `phase_anchor_iso` (not `composed_at_iso`) as event-start.
+
+**Rejected alternatives.**
+- **Compose-moment** (original ROADMAP draft): rejected — defeats D006 posture; events scattered across the day.
+- **Rounded-compose-moment** (e.g., round to nearest 15-min): rejected — still phase-incoherent; first morning brief might round to 07:45 or 09:15.
+- **Joe-configured-per-phase** (settings table): rejected — over-engineered for v1; the phase machine already encodes the cadence.
+
+**Related.**
+- [D006](#d006--delivery-channel-dedicated-hanna-icloud-calendar-with-0-minute-anchor-events) — posture rationale this honors.
+- scout-lanes-schemas findings (B2); belief c014.
+- Open question q004 — **closed by this entry.**
+
+---
+
+### D011 — L4b cross-platform stance: macOS-only with explicit `HannaCalendarNotAvailable` on non-Mac
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — "go on everything" on PRD Phase 1
+**Scope:** future `src/channels/calendar.py`; `scripts/first_hanna_brief.py` `main()` exit semantics; `.github/workflows/ci.yml` test matrix; [`docs/ROADMAP.md`](ROADMAP.md) §4 L4b spec.
+
+**Decision.** L4b's Calendar channel is **macOS-only** for v1. On non-macOS platforms (Linux CI, future Windows), `publish()` raises `HannaCalendarNotAvailable("osascript not present — Calendar channel is macOS-only at v1")`. `scripts/first_hanna_brief.py` `main()` catches this exception, logs it at INFO, and exits 0 with the brief still composed and persisted to SQLite — the lockout-style "well-defined no-op" pattern.
+
+CI (ubuntu-latest) exercises only the mocked-subprocess test path (`tests/test_calendar.py` ≥6 mocked cases per ROADMAP §4 L4b); real Calendar.app integration is gated on `HANNA_INTEGRATION_TEST_CALENDAR=1` env var that only Joe sets on his Mac.
+
+CalDAV / EventKit cross-platform paths are catalogued as future work but not committed; if Joe's primary device changes, D011 reverses via a new D-entry.
+
+**Reasoning.** Hanna runs on Joe's Mac. The Linux dev env (this remote container) and CI exist for code authoring + automated checks, not for production behavior. Making `publish()` cross-platform would add `caldav`/`vobject` dependencies for a behavior Joe doesn't use today (he lives in Apple Calendar). The macOS-only stance with explicit `HannaCalendarNotAvailable` keeps the contract honest: the channel exists where Joe is; elsewhere it returns a documented no-op.
+
+scout-lanes-schemas B1 + scout-architecture flagged this as drift between ROADMAP §4 (no platform gate) and NEXT.md (names the exception). D011 reconciles to NEXT.md's framing and writes it into the lane spec.
+
+**Implications.**
+- New exception class `HannaCalendarNotAvailable` in `src/channels/calendar.py` (L4b lane work).
+- `scripts/first_hanna_brief.py` `main()` gains the catch + log-and-skip path now (Phase 1 work, before L4b lands the channel module).
+- ROADMAP §4 L4b spec updated to require the platform gate at the top of `publish()`.
+- CI workflow unchanged (already ubuntu-latest with mocked-subprocess tests); explicit env-var-gated macOS integration noted in the L4b spec.
+
+**Rejected alternatives.**
+- **Cross-platform via CalDAV** (caldav + vobject pip deps): rejected — adds dep surface for a behavior Joe doesn't use; deferred to a future D-entry if Joe migrates off macOS.
+- **Cross-platform via EventKit** (PyObjC bridge): rejected — same dep-surface concern + macOS-only library anyway.
+- **Silent skip on non-macOS** (no exception, no log): rejected — opaque; the lockout-style explicit-no-op is the established Hanna pattern (Rule 34 model).
+
+**Related.**
+- [D006](#d006--delivery-channel-dedicated-hanna-icloud-calendar-with-0-minute-anchor-events) — names the channel; D011 names the platform surface.
+- scout-lanes-schemas findings (B1); belief c010.
+- Open question q005 — **closed by this entry.**
+
+---
+
+### D012 — L4b idempotency contract: brief-id key = SHA256(phase + anchor-date + product-name-set)
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — "go on everything" on PRD Phase 1
+**Scope:** [`src/schemas.py`](../src/schemas.py) `BriefPayload`; [`scripts/first_hanna_brief.py`](../scripts/first_hanna_brief.py) `briefs` SQLite schema + `_persist()`; future `src/channels/calendar.py` `publish()` dedup behavior.
+
+**Decision.** Every brief carries an idempotency key:
+
+```
+brief_id = sha256(phase.name + "|" + anchor_date_iso + "|" + "|".join(sorted(referenced_products))).hexdigest()[:16]
+```
+
+Where `anchor_date_iso` is the date-portion of `BriefPayload.phase_anchor_iso` (per D010). The `briefs` SQLite schema gains a `brief_id TEXT UNIQUE NOT NULL` column. `_persist()` becomes `INSERT OR IGNORE` — re-running the same composition (same phase, same anchor day, same product set) is a no-op on disk. L4b's `publish()` uses `brief_id` to look up a previously-published `CalendarEventId` before creating; on collision it returns the existing event-id.
+
+**Reasoning.** Without an idempotency contract, scout-ops B-OPS-002 surfaced that L4b would create **duplicate Joe-visible calendar events on every retry** (crash recovery, restart, accidental re-invocation). The chosen key shape uses semantically meaningful inputs (phase + anchor day + product set) so two intentional compositions with the same content collide, while a re-compose-with-different-products yields a fresh brief_id. The 16-char prefix of SHA256 gives ~10^19 collision space — sufficient for a single-user multi-decade calendar.
+
+The key is computed deterministically from `BriefPayload` fields; no external state (clock, randomness) is required, so the same brief computed on two different machines produces the same key.
+
+**Implications.**
+- `BriefPayload` gains a `brief_id: str` field; `_compose_brief()` computes it after `phase_anchor_iso` is set.
+- `scripts/first_hanna_brief.py` SCHEMA constant gets the new column + UNIQUE; existing `data/hanna.sqlite` files survive via `ALTER TABLE` migration on `_persist()` (or fresh-schema since data/*.sqlite is gitignored — the recovery path is "delete and recompose").
+- `_persist()` uses `INSERT OR IGNORE`; `tests/test_first_hanna_brief.py` gains a re-invocation dedup test.
+- L4b's `publish()` contract (in ROADMAP §4) gains the lookup-by-brief_id behavior.
+
+**Rejected alternatives.**
+- **UUID4 per brief**: rejected — random; same composition would get distinct UUIDs, defeating dedup.
+- **ULID with anchor-time embedded**: rejected — temporally-ordered keys leak the compose moment; D010 already separated anchor from compose, no need to re-mix.
+- **Content hash over body_markdown**: rejected — sensitive to whitespace/voice changes (e.g. the 0f35f33 voice fix would have invalidated all prior briefs); semantic-key over (phase, day, products) is more robust.
+- **Joe-clears-dedup-manually**: rejected — Rule 36 violation (forces a decision on Joe).
+
+**Related.**
+- [D006](#d006--delivery-channel-dedicated-hanna-icloud-calendar-with-0-minute-anchor-events) + [D010](#d010--l4b-rhythm-anchor-events-land-at-0900-et-phase-anchor-not-compose-moment).
+- scout-ops findings (B-OPS-002); scout-lanes-schemas; belief c012.
+- Open question q006 — **closed by this entry.**
+
+---
+
 ## End of decisions log
 
-Next decision number: **D010**.
+Next decision number: **D013**.

@@ -11,7 +11,7 @@ from __future__ import annotations
 import sqlite3
 import sys
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -19,6 +19,15 @@ from src.computations.compute_brief_priority import compute_brief_priority
 from src.computations.compute_producer_phase import compute_producer_phase
 from src.harlo_bridge import HarloBridge, HarloTimeout, HarloUnreachable
 from src.schemas import BriefPayload, ProducerPhase, ProductFile, ProductStatus
+
+# D011: catch HannaCalendarNotAvailable from L4b's future Calendar channel.
+# Until src/channels/calendar.py lands, define a local stub class so the
+# except-clause in main() is always wired and importable.
+try:
+    from src.channels.calendar import HannaCalendarNotAvailable  # type: ignore[import-not-found]
+except ImportError:
+    class HannaCalendarNotAvailable(Exception):
+        """Stub: L4b's real exception class will replace this on import."""
 
 _STATUS_DISPLAY_ORDER = {
     ProductStatus.IN_FLIGHT.value: 0,
@@ -37,7 +46,9 @@ CREATE TABLE IF NOT EXISTS briefs (
     ts TEXT NOT NULL,
     phase TEXT NOT NULL,
     body TEXT NOT NULL,
-    harlo_reachable INTEGER NOT NULL
+    harlo_reachable INTEGER NOT NULL,
+    brief_id TEXT UNIQUE,
+    phase_anchor_iso TEXT NOT NULL DEFAULT ''
 )
 """
 
@@ -148,21 +159,39 @@ def _compose_brief(phase: ProducerPhase, harlo_reachable: bool, harlo_payload: d
         f"{approaching_line}{blockers_line}"
         f"Surfacing this as observation — the call on what to pick up first is yours."
     )
+    # D010: compute rhythm-anchor against the current ET compose-date.
+    compose_date = datetime.now(ZoneInfo("America/New_York")).date()
+    phase_anchor_iso = BriefPayload.compute_phase_anchor_iso(phase, compose_date)
+    # D012: derive idempotency key from phase + anchor day + product set.
+    brief_id = BriefPayload.compute_brief_id(phase, phase_anchor_iso, list(ranked))
     return BriefPayload(
         phase=phase,
         composed_at_iso=composed_at,
         body_markdown=body,
         referenced_products=list(ranked),
+        phase_anchor_iso=phase_anchor_iso,
+        brief_id=brief_id,
     )
 
 
-def _persist(ts: str, phase: str, body: str, harlo_reachable: bool) -> None:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(DB_PATH) as conn:
+def _persist(brief: BriefPayload, harlo_reachable: bool, db_path: Path | None = None) -> None:
+    """Persist a BriefPayload to SQLite. D012: INSERT OR IGNORE for on-disk idempotency."""
+    target = db_path if db_path is not None else DB_PATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(target) as conn:
         conn.execute(SCHEMA)
         conn.execute(
-            "INSERT INTO briefs (ts, phase, body, harlo_reachable) VALUES (?, ?, ?, ?)",
-            (ts, phase, body, 1 if harlo_reachable else 0),
+            "INSERT OR IGNORE INTO briefs "
+            "(ts, phase, body, harlo_reachable, brief_id, phase_anchor_iso) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                brief.composed_at_iso,
+                brief.phase.name.lower(),
+                brief.body_markdown,
+                1 if harlo_reachable else 0,
+                brief.brief_id or None,
+                brief.phase_anchor_iso,
+            ),
         )
         conn.commit()
 
@@ -175,7 +204,13 @@ def main() -> int:
 
     harlo_reachable, harlo_payload = _read_harlo()
     brief = _compose_brief(phase, harlo_reachable, harlo_payload)
-    _persist(brief.composed_at_iso, phase.name.lower(), brief.body_markdown, harlo_reachable)
+    _persist(brief, harlo_reachable)
+    # D011: future L4b publish() may raise on non-macOS; brief stays composed + persisted,
+    # exit-0 lockout-style so the SQLite row is preserved across non-mac environments.
+    try:
+        pass  # L4b publish() lands here in a later commit.
+    except HannaCalendarNotAvailable as exc:
+        print(f"Calendar channel unavailable (non-mac); brief persisted only. {exc}")
     print(brief.body_markdown)
     return 0
 

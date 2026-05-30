@@ -2,9 +2,28 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
+from datetime import date, datetime, time
 from enum import Enum, IntEnum
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+
+# Per D010 phase→anchor table (ET):
+#   MORNING=09:00, MIDDAY=12:00, EVENING=17:00,
+#   WEEKLY_MONDAY=09:30, WEEKLY_FRIDAY=16:00,
+#   MONTHLY=09:00 first weekday of month.
+# FAMILY_LOCKOUT has no publish path → empty anchor.
+_PHASE_ANCHOR_TIME: dict[int, time] = {
+    1: time(9, 0),   # MORNING
+    2: time(12, 0),  # MIDDAY
+    3: time(17, 0),  # EVENING
+    4: time(9, 30),  # WEEKLY_MONDAY
+    5: time(16, 0),  # WEEKLY_FRIDAY
+    6: time(9, 0),   # MONTHLY
+}
 
 
 class ProducerPhase(IntEnum):
@@ -134,3 +153,54 @@ class BriefPayload:
     composed_at_iso: str
     body_markdown: str
     referenced_products: list[str] = field(default_factory=list)
+    # D010: ET-anchored ISO timestamp for the brief's rhythm-anchor (event start).
+    phase_anchor_iso: str = ""
+    # D012: SHA256-derived dedup key (16-char prefix); empty when phase_anchor_iso is empty.
+    brief_id: str = ""
+
+    @staticmethod
+    def compute_phase_anchor_iso(phase: ProducerPhase, compose_date: date) -> str:
+        """Return the ET-anchored ISO 8601 timestamp for the given phase + compose_date.
+
+        Per D010 phase→anchor table. For MONTHLY, anchors to the first weekday of
+        compose_date's month. For FAMILY_LOCKOUT, returns empty string (no publish).
+        """
+        if phase == ProducerPhase.FAMILY_LOCKOUT:
+            return ""
+        anchor_time = _PHASE_ANCHOR_TIME.get(int(phase))
+        if anchor_time is None:
+            return ""
+        if phase == ProducerPhase.MONTHLY:
+            anchor_date = _first_weekday_of_month(compose_date)
+        else:
+            anchor_date = compose_date
+        return datetime.combine(anchor_date, anchor_time, tzinfo=_ET).isoformat()
+
+    @staticmethod
+    def compute_brief_id(
+        phase: ProducerPhase,
+        phase_anchor_iso: str,
+        referenced_products: list[str],
+    ) -> str:
+        """Return the 16-char SHA256 prefix dedup key per D012.
+
+        Key = sha256(phase.name + "|" + anchor_date_iso + "|" +
+                     "|".join(sorted(referenced_products))).hexdigest()[:16]
+        where anchor_date_iso is the date-portion (first 10 chars) of phase_anchor_iso.
+        Returns empty string when phase_anchor_iso is empty (FAMILY_LOCKOUT path).
+        """
+        if not phase_anchor_iso:
+            return ""
+        anchor_date_iso = phase_anchor_iso[:10]
+        sorted_products = "|".join(sorted(referenced_products))
+        payload = f"{phase.name}|{anchor_date_iso}|{sorted_products}"
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _first_weekday_of_month(d: date) -> date:
+    """Return the first Mon–Fri date of d's month."""
+    candidate = date(d.year, d.month, 1)
+    # weekday(): Mon=0 … Sun=6; weekday < 5 is Mon–Fri.
+    while candidate.weekday() >= 5:
+        candidate = date(candidate.year, candidate.month, candidate.day + 1)
+    return candidate

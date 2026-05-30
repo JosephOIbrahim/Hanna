@@ -336,3 +336,88 @@ class TestStderrDrainer:
         bridge = HarloBridge()
         assert isinstance(bridge._stderr_ring, collections.deque)
         assert bridge._stderr_ring.maxlen == 64
+
+
+# --------------------------------------------------------------------------
+# Frame coalescing — round-3 _recv_buffer regression coverage (belief c007)
+# --------------------------------------------------------------------------
+
+
+class TestFrameCoalescing:
+    """Regress the round-3 fix: when a single os.read() returns bytes from
+    two LSP frames concatenated, the trailing bytes beyond content_length
+    MUST be buffered in `self._recv_buffer` and reused on the next
+    `_read_frame_with_timeout` call. Without the buffer, the second frame's
+    head was dropped and subsequent RPCs desynchronized.
+    """
+
+    def test_two_frames_in_one_read_both_decoded(self) -> None:
+        proc = _PipeProc()
+        try:
+            bridge = HarloBridge()
+            payload_one = {"jsonrpc": "2.0", "id": 1, "result": {"step": "first"}}
+            payload_two = {"jsonrpc": "2.0", "id": 2, "result": {"step": "second"}}
+            # Write BOTH frames in a single os.write — the read side will
+            # very likely receive them in one os.read(), exercising the
+            # coalescing path.
+            proc.feed(_frame(payload_one) + _frame(payload_two))
+            first = bridge._read_frame_with_timeout(proc, timeout=1.0)  # type: ignore[arg-type]
+            assert first == payload_one
+            # The second call must NOT block on the pipe (the bytes are
+            # already in _recv_buffer); a generous timeout protects CI but
+            # the call should return immediately on the happy path.
+            second = bridge._read_frame_with_timeout(proc, timeout=1.0)  # type: ignore[arg-type]
+            assert second == payload_two
+            # After consuming both frames cleanly, the buffer is drained.
+            assert len(bridge._recv_buffer) == 0
+        finally:
+            proc.close()
+
+    def test_partial_second_frame_buffered(self) -> None:
+        proc = _PipeProc()
+        try:
+            bridge = HarloBridge()
+            payload_one = {"jsonrpc": "2.0", "id": 10, "result": {"ok": True}}
+            payload_two = {"jsonrpc": "2.0", "id": 11, "result": {"ok": "again"}}
+            frame_two = _frame(payload_two)
+            # Frame-1 complete, then only the header block of frame-2 (split
+            # at the body boundary so phase-2 has bytes but phase-3 must
+            # wait for more).
+            header_end = frame_two.index(b"\r\n\r\n") + 4
+            head_only = frame_two[:header_end]
+            tail = frame_two[header_end:]
+            proc.feed(_frame(payload_one) + head_only)
+            first = bridge._read_frame_with_timeout(proc, timeout=1.0)  # type: ignore[arg-type]
+            assert first == payload_one
+            # Buffer must hold the partial frame-2 header bytes for the next
+            # call — proves the coalesce path didn't discard them.
+            assert len(bridge._recv_buffer) > 0
+            assert bytes(bridge._recv_buffer) == head_only
+            # Feed the remaining body and complete the second read.
+            proc.feed(tail)
+            second = bridge._read_frame_with_timeout(proc, timeout=1.0)  # type: ignore[arg-type]
+            assert second == payload_two
+            assert len(bridge._recv_buffer) == 0
+        finally:
+            proc.close()
+
+    def test_recv_buffer_cleared_on_close(self) -> None:
+        proc = _PipeProc()
+        try:
+            bridge = HarloBridge()
+            payload_one = {"jsonrpc": "2.0", "id": 20, "result": {"ok": True}}
+            payload_two = {"jsonrpc": "2.0", "id": 21, "result": {"ok": True}}
+            frame_two = _frame(payload_two)
+            # Frame-1 complete + partial frame-2 (header only) so that after
+            # reading frame-1, _recv_buffer has leftover bytes.
+            header_end = frame_two.index(b"\r\n\r\n") + 4
+            proc.feed(_frame(payload_one) + frame_two[:header_end])
+            first = bridge._read_frame_with_timeout(proc, timeout=1.0)  # type: ignore[arg-type]
+            assert first == payload_one
+            assert len(bridge._recv_buffer) > 0
+            # close() must drain the buffer so a fresh proc handle doesn't
+            # inherit stale bytes from a previous subprocess generation.
+            bridge.close()
+            assert len(bridge._recv_buffer) == 0
+        finally:
+            proc.close()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -206,3 +207,51 @@ class TestBriefPayload:
         )
         with pytest.raises(FrozenInstanceError):
             payload.body_markdown = "mutated"  # type: ignore[misc]
+
+
+class TestComputePhaseAnchorIso:
+    """D010: rhythm-anchor ISO timestamps per phase, anchored in ET."""
+
+    def test_morning_anchors_at_0900_et_on_compose_date(self):
+        compose_date = date(2026, 5, 22)  # Friday — irrelevant for MORNING anchor
+        anchor = BriefPayload.compute_phase_anchor_iso(ProducerPhase.MORNING, compose_date)
+        # ET on 2026-05-22 is EDT (-04:00).
+        assert anchor == "2026-05-22T09:00:00-04:00"
+        assert anchor.startswith("2026-05-22")  # date portion preserved
+        assert "-04:00" in anchor or "-05:00" in anchor  # ET-anchored
+
+    def test_midday_anchors_at_1200_et(self):
+        compose_date = date(2026, 5, 22)
+        anchor = BriefPayload.compute_phase_anchor_iso(ProducerPhase.MIDDAY, compose_date)
+        assert anchor == "2026-05-22T12:00:00-04:00"
+
+    def test_evening_anchors_at_1700_et_and_preserves_compose_date(self):
+        compose_date = date(2026, 1, 15)  # winter → EST (-05:00)
+        anchor = BriefPayload.compute_phase_anchor_iso(ProducerPhase.EVENING, compose_date)
+        assert anchor == "2026-01-15T17:00:00-05:00"
+        # Date portion matches input compose_date.
+        assert anchor[:10] == "2026-01-15"
+
+
+class TestComputeBriefId:
+    """D012: SHA256-derived dedup keys."""
+
+    def test_different_products_yield_different_ids(self):
+        anchor = "2026-05-22T09:00:00-04:00"
+        id_a = BriefPayload.compute_brief_id(ProducerPhase.MORNING, anchor, ["harlo"])
+        id_b = BriefPayload.compute_brief_id(ProducerPhase.MORNING, anchor, ["octavius"])
+        assert id_a != id_b
+        assert len(id_a) == 16
+        assert len(id_b) == 16
+
+    def test_same_inputs_yield_same_id(self):
+        anchor = "2026-05-22T09:00:00-04:00"
+        products = ["harlo", "octavius", "moneta"]
+        id_first = BriefPayload.compute_brief_id(ProducerPhase.MIDDAY, anchor, products)
+        id_second = BriefPayload.compute_brief_id(ProducerPhase.MIDDAY, anchor, list(products))
+        assert id_first == id_second
+        # Product ordering is normalized via sort — different input order, same key.
+        id_reordered = BriefPayload.compute_brief_id(
+            ProducerPhase.MIDDAY, anchor, ["moneta", "harlo", "octavius"]
+        )
+        assert id_first == id_reordered
