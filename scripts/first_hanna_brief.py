@@ -34,21 +34,17 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from src._log import get_logger
+from src.channels.calendar import (
+    HannaCalendarError,
+    HannaCalendarNotAvailable,
+    publish as calendar_publish,
+)
 from src.computations.compute_brief_priority import compute_brief_priority
 from src.computations.compute_producer_phase import compute_producer_phase
 from src.harlo_bridge import HarloBridge, HarloTimeout, HarloUnreachable
 from src.schemas import BriefPayload, ProducerPhase, ProductFile, ProductStatus
 
 logger = get_logger("hanna.brief")
-
-# D011: catch HannaCalendarNotAvailable from L4b's future Calendar channel.
-# Until src/channels/calendar.py lands, define a local stub class so the
-# except-clause in main() is always wired and importable.
-try:
-    from src.channels.calendar import HannaCalendarNotAvailable  # type: ignore[import-not-found]
-except ImportError:
-    class HannaCalendarNotAvailable(Exception):
-        """Stub: L4b's real exception class will replace this on import."""
 
 _STATUS_DISPLAY_ORDER = {
     ProductStatus.IN_FLIGHT.value: 0,
@@ -69,9 +65,36 @@ CREATE TABLE IF NOT EXISTS briefs (
     body TEXT NOT NULL,
     harlo_reachable INTEGER NOT NULL,
     brief_id TEXT UNIQUE,
-    phase_anchor_iso TEXT NOT NULL DEFAULT ''
+    phase_anchor_iso TEXT NOT NULL DEFAULT '',
+    calendar_event_uid TEXT,
+    unpublished_reason TEXT
 )
 """
+
+# D006/D011/D012 reconciliation columns added in L4b. The migrations below
+# allow older `data/hanna.sqlite` files (created before L4b landed) to gain
+# the new columns without losing existing rows; each ALTER is wrapped in a
+# try/except sqlite3.OperationalError so re-runs are idempotent.
+_RECONCILIATION_MIGRATIONS = (
+    "ALTER TABLE briefs ADD COLUMN calendar_event_uid TEXT",
+    "ALTER TABLE briefs ADD COLUMN unpublished_reason TEXT",
+)
+
+
+def _apply_reconciliation_migrations(conn: sqlite3.Connection) -> None:
+    """Add the L4b reconciliation columns to legacy schemas in-place.
+
+    Each ALTER is idempotent — sqlite3 raises OperationalError when the
+    column already exists, which is the steady-state for any fresh schema
+    created by ``SCHEMA`` above. The try/except swallows that specific
+    duplicate-column case and surfaces every other operational error.
+    """
+    for stmt in _RECONCILIATION_MIGRATIONS:
+        try:
+            conn.execute(stmt)
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
 
 
 def _apply_pragmas(conn: sqlite3.Connection) -> None:
@@ -237,6 +260,9 @@ def _persist(brief: BriefPayload, harlo_reachable: bool, db_path: Path | None = 
     with sqlite3.connect(target) as conn:
         _apply_pragmas(conn)
         conn.execute(SCHEMA)
+        # L4b: bring legacy DBs up to the reconciliation schema before the
+        # insert. Idempotent on already-migrated and fresh-created tables.
+        _apply_reconciliation_migrations(conn)
         conn.execute(
             "INSERT OR IGNORE INTO briefs "
             "(ts, phase, body, harlo_reachable, brief_id, phase_anchor_iso) "
@@ -250,6 +276,50 @@ def _persist(brief: BriefPayload, harlo_reachable: bool, db_path: Path | None = 
                 brief.phase_anchor_iso,
             ),
         )
+        conn.commit()
+
+
+def _update_reconciliation(
+    brief_id: str,
+    *,
+    calendar_event_uid: str | None = None,
+    unpublished_reason: str | None = None,
+    db_path: Path | None = None,
+) -> None:
+    """Update the L4b reconciliation columns for an already-persisted brief.
+
+    Either *calendar_event_uid* or *unpublished_reason* may be set; per the
+    P6 invariant exactly one of them is meaningful for any non-lockout row.
+    The reconciliation is keyed on ``brief_id`` which is the D012 dedup
+    handle. Briefs with an empty ``brief_id`` (e.g. FAMILY_LOCKOUT briefs
+    whose phase_anchor_iso is empty) are matched on ``phase`` + ``ts`` as
+    a fallback so the invariant still holds for lockout rows persisted
+    through helper code paths.
+    """
+    target = db_path if db_path is not None else DB_PATH
+    if not target.exists():
+        return
+    with sqlite3.connect(target) as conn:
+        _apply_pragmas(conn)
+        _apply_reconciliation_migrations(conn)
+        if brief_id:
+            conn.execute(
+                "UPDATE briefs SET calendar_event_uid = ?, "
+                "unpublished_reason = ? WHERE brief_id = ?",
+                (calendar_event_uid, unpublished_reason, brief_id),
+            )
+        else:
+            # Fallback for briefs without a stable brief_id (FAMILY_LOCKOUT
+            # rows produced by helper code paths). Touches the most-recent
+            # NULL-brief_id row so the invariant has somewhere to land.
+            conn.execute(
+                "UPDATE briefs SET calendar_event_uid = ?, "
+                "unpublished_reason = ? WHERE id = ("
+                "  SELECT id FROM briefs WHERE brief_id IS NULL "
+                "  ORDER BY id DESC LIMIT 1"
+                ")",
+                (calendar_event_uid, unpublished_reason),
+            )
         conn.commit()
 
 
@@ -269,12 +339,32 @@ def main() -> int:
         brief.brief_id or "(none)",
         harlo_reachable,
     )
-    # D011: future L4b publish() may raise on non-macOS; brief stays composed + persisted,
-    # exit-0 lockout-style so the SQLite row is preserved across non-mac environments.
+    # D011 / D006 reconciliation: try to publish; on non-mac or other
+    # calendar-channel failures, persist the failure reason rather than
+    # crashing — the brief stays composed + persisted, exit-0 lockout-style.
     try:
-        pass  # L4b publish() lands here in a later commit.
+        event_id = calendar_publish(brief)
     except HannaCalendarNotAvailable as exc:
+        logger.info("calendar unavailable (non-mac); brief persisted only. %s", exc)
+        _update_reconciliation(brief.brief_id, unpublished_reason="non_macos")
         print(f"Calendar channel unavailable (non-mac); brief persisted only. {exc}")
+    except HannaCalendarError as exc:
+        logger.warning(
+            "calendar publish failed (%s); brief persisted only. %s",
+            type(exc).__name__,
+            exc,
+        )
+        _update_reconciliation(
+            brief.brief_id,
+            unpublished_reason=f"publish_failed: {type(exc).__name__}",
+        )
+    else:
+        if event_id is None:
+            # publish() returned a graceful no-op for an empty anchor (D010/D011);
+            # FAMILY_LOCKOUT exits earlier, so this path is the empty-anchor case.
+            _update_reconciliation(brief.brief_id, unpublished_reason="no_anchor")
+        else:
+            _update_reconciliation(brief.brief_id, calendar_event_uid=str(event_id))
     print(brief.body_markdown)
     logger.info("main exit=0 phase=%s harlo_reachable=%s", phase.name.lower(), harlo_reachable)
     return 0

@@ -7,9 +7,16 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from enum import Enum, IntEnum
 from pathlib import Path
+from typing import NewType
 from zoneinfo import ZoneInfo
 
 from src import _log
+
+# D006 / D012: a Calendar event's UID — the substrate-of-truth handle Hanna
+# uses to look up a previously-published brief on the dedicated "Hanna" iCloud
+# calendar before authoring a duplicate. NewType keeps the type discipline at
+# the call sites without runtime cost.
+CalendarEventId = NewType("CalendarEventId", str)
 
 _ET = ZoneInfo("America/New_York")
 
