@@ -753,6 +753,49 @@ scout-architecture flagged q007 as gating L6 dispatch. D015 closes it cleanly.
 
 ---
 
+---
+
+### D016 — Octavius reachability finding: exists on GitHub, not yet installed locally; L7 gates on contract surfacing + local install
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — direct reply to q016 at DELIBERATE cycle 1: "It exists on GitHub not locally yet."
+**Scope:** [F3](../state/tasks/hanna-real-arc/SPEC.md) (falsification condition); L7 `octavius_bridge.py` design + dispatch ordering; `FormationRequest`/`FormationOutput` schemas (deferred from Line B); closes [q016](../state/open_questions.md); raises [q017](../state/open_questions.md) (contract surfacing path).
+
+**Decision.** Octavius is a real GitHub repo but is **not installed locally on Joe's Mac** as of 2026-05-25. F3 (Octavius doesn't exist) is FALSE — falsification condition is not triggered, and L7 IS buildable in principle. However, L7's runtime verifier (P4 — spawn/poll/harvest end-to-end) cannot fire until two preconditions hold:
+
+1. **Joe installs Octavius locally.** The L7 binary must be on Joe's `PATH` (or at a known absolute path) for `subprocess.Popen(["octavius", "mcp"])` to succeed.
+2. **Hanna learns Octavius's IPC contract.** The MCP-stdio request/response envelope shape (spawn-formation / poll / harvest) must be specified before `FormationRequest` and `FormationOutput` schemas can be authored. Three candidate paths surface as **q017**: (a) Joe pastes the contract verbatim; (b) widen `mcp__github__*` scope to include the Octavius repo so an agent reads it; (c) Joe installs locally + runs it once + shares the API shape from real traffic.
+
+L7's `src/octavius_bridge.py` lands as a **stub with `NotImplementedError`** until both preconditions are met. `FormationRequest`/`FormationOutput` schemas stay deferred. L7's runtime verifier is gated; mocked tests can still build against the stub.
+
+The Hanna arc CAN proceed: L4b (this cycle), L5 partial (JoeStateSnapshot now; Override + Formation later), L6 (mcp_server.py with `hanna_formation_request` returning a `LockoutResponse`-equivalent "OCTAVIUS_NOT_INSTALLED" until L7 ratifies). The arc terminates at "Hanna is real with Octavius stubbed" if q017 stays open at SHIP; that's a documented bounded weakness, not a showstopper.
+
+**Reasoning.** Joe's direct answer to q016 is the verifier the dead Line C spike couldn't be. The DEADENDS-c033 class extends (c035): this Linux sandbox + restricted GitHub MCP scope can't reach Octavius's contract either, so the question recurses to Joe.
+
+The L7 stub-first posture is the harness's "MISSING VERIFIER → build it before proceeding. It may be the deliverable" rule applied: until the runtime verifier exists (Joe installs Octavius), we ship the SHAPE that the verifier will gate, and we DO ship it — just behind a documented NotImplementedError.
+
+**Implications.**
+- `FormationRequest` and `FormationOutput` schemas remain deferred at Line B / cycle 2; they author after q017 closes.
+- L7 lands `src/octavius_bridge.py` with classes + method signatures + docstrings + `NotImplementedError`-bodies + mocked-subprocess tests. The real implementation lands when q017 resolves.
+- The L6 `hanna_formation_request` MCP tool returns a `LockoutResponse`-equivalent JSON `{ "octavius_installed": false, "install_path_hint": "<TBD>" }` on Joe's Mac until the local install completes.
+- Arc CHAMPION's P4 confidence stays at 0.40 until q017 closes; on close + local install, P4 jumps to ~0.75.
+- DEADENDS-c033 class is generalized to c035: "Linux-sandbox + restricted GitHub MCP scope cannot reach external resources outside that scope."
+
+**Rejected alternatives.**
+- **Author `FormationRequest`/`FormationOutput` speculatively now from BLUEPRINT §9 prose**. Rejected — guessing wrong forces schema redo + Rule 36 violation (committing fields not grounded in evidence).
+- **Block the entire arc on q017**. Rejected — Lines A and B can run usefully without Octavius's contract; only L7 + half of L5 + one MCP tool gate on it.
+- **Skip L7 entirely; remove P4 from SPEC**. Rejected — P4 is part of "Hanna is real" per the ratified SPEC; the arc reverses cleanly via SHIP report bounded-weakness if needed, but the runway exists.
+
+**Related.**
+- F3 (state/tasks/hanna-real-arc/SPEC.md) — falsification condition NOT triggered.
+- c034 (state/beliefs.md) — records the finding.
+- c035 — DEADENDS class generalization.
+- q016 — closed by this entry.
+- q017 — raised by this entry (high-leverage; gates L7 runtime + 2 of 4 L5 schemas).
+
+---
+
 ## End of decisions log
 
-Next decision number: **D016**.
+Next decision number: **D017**.
