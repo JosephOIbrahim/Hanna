@@ -1,0 +1,13 @@
+# LEDGER.md — durable skill ledger (cross-GOAL)
+
+Append-only registry of recipes that survived verification. Read BEFORE improvising; write AFTER the recipe demonstrates its keep.
+
+**Format per row:** `name | goal | approach | verifier-result | when-to-use | when-not | (cross-ref)`
+
+| name | goal | approach | verifier-result | when-to-use | when-not | cross-ref |
+|---|---|---|---|---|---|---|
+| canonical-commit-trailer | every commit ends with the same trailer for impersonation-classifier safety | `🤖 Generated with [Claude Code]...\n\nCo-Authored-By: Claude <noreply@anthropic.com>` | landed across 35+ commits with no classifier hits | every commit | when the user explicitly says "drop the trailer" | CLAUDE.md §"Commit trailer (canonical)" |
+| moe-dispatch-d002 | substrate-level code work uses Mixture-of-Experts: builder workers in parallel + Compliance Reviewer last-and-alone | one Agent call per role, `worker` or `critic` subagent_type, self-contained briefs (cold read) per Delegation Contract | proven across 3 commits (L3b, L4a, this cycle's Phase 1–6) with PASS verdicts at every dispatch | substrate-level code with ≥2 expert roles | trivial single-line fixes; spike docs; personal-context updates | D002, ORCHESTRATOR.md §1 |
+| belief-supersession | mark a prior claim as superseded with explicit SUPERSEDED_BY link rather than deleting; preserve the audit trail | edit the prior row's STATUS to `superseded` and SUPERSEDED_BY to the new c-ID; add the new row | proven across c007→c019, c008→c021, c011→c027, c012→c017, c013→c023, c006→c020, c009→c015 in this branch | every time a new claim contradicts or strengthens an active one | when the new claim merely supports the prior — file as evidence, not supersession | ORCHESTRATOR.md §3 + D009 |
+| pytest-as-l1 | use pytest run as the L1 behavioral verifier across all Hanna work | `python3 -m pytest tests/ -q` returns pass count + status; the count is mechanical evidence of progress | 14 commits' worth of CI green; CI completes in ~13s | always, after any src/ or tests/ edit | when the change is docs-only — but running pytest as a regression gate is still cheap | CI workflow + every Phase commit |
+| ci-rule-allowlist-pattern | replace bypassable name-anchored grep with an authoritative allowlist check derived from a ratified spec (D-entry) | inline python3 in ci.yml parses real call sites + asserts ⊆ allowlist; fails on found-outside-allowlist AND on zero-sites-found (catches broken regex) | landed Phase 3; empirically returns D001's 5-tool set on the current bridge | any rule where a name-anchored grep is bypassable by rename | rules where the call site can't be enumerated | Phase 3 commit `5744142` |

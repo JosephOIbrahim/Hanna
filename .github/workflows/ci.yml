@@ -21,10 +21,14 @@ jobs:
           pip install -e ".[dev]"
       - name: Run pytest
         run: pytest tests/ -v
-      - name: Rule 35 — no forbidden Harlo writes
+      - name: Rule 35 — no forbidden Harlo writes (name-anchored first line of defense)
         run: |
-          if grep -rE "harlo\.(write|store|author|mutate)" src/ scripts/ ; then
+          if grep -rE "harlo\.(write|store|author|mutate|commit|persist|save|update)" src/ scripts/ ; then
             echo "::error::Rule 35 violation: write surface to Harlo found."
+            exit 1
+          fi
+          if grep -rE "octavius\.(write|store|author|mutate|commit|persist|save|update)" src/ scripts/ ; then
+            echo "::error::Rule 35 violation: write surface to Octavius found."
             exit 1
           fi
       - name: Rule 35 — no forbidden cognitive-twin store/stage/verify calls
@@ -33,10 +37,57 @@ jobs:
             echo "::error::Rule 35 violation: forbidden cognitive-twin call."
             exit 1
           fi
-      - name: Rule 37 — no patent topics
+      - name: Rule 35 — enumerated bridge surface (authoritative allowlist per D001)
         run: |
-          if grep -rEi "patent|provisional|uspto|claim[[:space:]]+language" src/ scripts/ tests/ ; then
-            echo "::error::Rule 37 violation: patent topic found in code."
+          python3 - <<'PY'
+          import re, sys, pathlib
+          allowlist = {"status", "coach", "recall", "query_past_experience", "patterns"}
+          path = pathlib.Path("src/harlo_bridge.py")
+          text = path.read_text(encoding="utf-8")
+          # Match self._call_tool("X" — capture X.
+          pattern = re.compile(r'self\._call_tool\(\s*["\']([^"\']+)["\']')
+          found = set(pattern.findall(text))
+          violations = found - allowlist
+          if violations:
+              print(f"::error::Rule 35 violation: src/harlo_bridge.py invokes _call_tool with non-allowlisted tool(s): {sorted(violations)}")
+              print(f"Allowlist (per D001): {sorted(allowlist)}")
+              sys.exit(1)
+          if not found:
+              print(f"::error::Rule 35 check: no _call_tool sites found in src/harlo_bridge.py — pattern broken?")
+              sys.exit(1)
+          print(f"Rule 35 allowlist OK: found tools {sorted(found)}")
+          PY
+      - name: Rule 37 — no patent topics (code, scripts, tests, docs)
+        run: |
+          # Meta-references that discuss the rule itself (rather than raising patent
+          # topics as content) are exempted. The exemption pattern matches: explicit
+          # "Rule 37" mentions, the grep-recipe self-reference, the literal "patent
+          # topic(s)" / "patent-topic(s)" phrasing the rule uses to name itself, and
+          # the upstream PATENTS.md filename reference.
+          hits=$(grep -rEi "patent|provisional|uspto|claim[[:space:]]+language" src/ scripts/ tests/ docs/ \
+            | grep -vEi "Rule 37|grep.*patent|patent[- ]topic|patent[- ]adjacent|PATENTS\.md|no patent" \
+            || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Rule 37 violation: patent topic found in code or docs."
+            echo "$hits"
+            exit 1
+          fi
+      - name: Rule 37 — no patent topics in commit messages (last 50)
+        run: |
+          # Need enough history; checkout above uses default depth=1, so fetch more.
+          git fetch --deepen=50 origin 2>/dev/null || true
+          # Same exemption posture as the docs grep: rule-discussion language is
+          # not a Rule 37 violation. Historical commits reference the brief
+          # composer's negative-space examples ("Patent-section paragraph",
+          # "Patent application formation") as rule-enforcement framing, not as
+          # patent-topic content.
+          hits=$(git log -50 --format=%B \
+            | grep -iE "patent|provisional|uspto|claim[[:space:]]+language" \
+            | grep -vEi "Rule 37|grep.*patent|patent[- ]topic|patent[- ]adjacent|patent[- ]section|patent application formation|no patent" \
+            || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Rule 37 violation: patent topic found in recent commit messages."
+            echo "$hits"
             exit 1
           fi
       - name: Rule 1 — no sleep() calls

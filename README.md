@@ -155,18 +155,39 @@ Full text: [`RULES.md`](RULES.md). Compliance grep recipes ship at the bottom of
 ## Repository layout
 
 ```
-HANNA_BLUEPRINT.md          architectural spec (v0.1.0-draft)
-RULES.md                    33 inviolable rules + 8 safeguards + 4 addenda
+HANNA_BLUEPRINT.md          architectural spec (v0.2.0-audit)
+RULES.md                    33 inviolable rules + 8 safeguards + 4 producer addenda
 CLAUDE.md                   project-local AI collaboration instructions
-NEXT.md                     end-of-day handoff for the next session
+ORCHESTRATOR.md             multi-agent orchestrator operating manual (D009)
+NEXT.md                     session-state checkpoint + next-session handoff
 NOTICE                      attribution to Harlo substrate
 LICENSE                     Apache 2.0
 docs/
   CONVENTIONS.md            day-to-day conventions
-  SESSION_01_RECON.md       session 1 observation doc
-web/
-  templates/                Phase-1 design reference (HTML mockups)
-  README.md                 design system documentation
+  DECISIONS.md              ratified substrate decisions (D001–D013)
+  ROADMAP.md                lane-DAG status table (the buildout SSOT)
+  PRODUCER_LENS.md          what Hanna's producer role looks like
+  UI_UX_MAP.md              UI feature map for Claude design exploration
+  REVIEW_2026-05-22.md      first-principles review that drove D005–D008
+  SPIKE_HARLO_EDGE_2026-05-20.md   Harlo MCP-edge spike findings
+  SESSION_01_RECON.md       session 1 observation doc (historical)
+src/
+  schemas.py                ProducerPhase, ProductFile, BriefPayload (D007+D010+D012)
+  harlo_bridge.py           read-only MCP-stdio client to Harlo (D001+D005)
+  computations/             pure functions (Rule 36 — surface, don't decide)
+scripts/
+  first_hanna_brief.py      day-zero PoC (per BLUEPRINT §11.1)
+tests/                      pytest suite (107+ tests)
+state/
+  beliefs.md                durable belief layer (orchestrator single-writer)
+  open_questions.md         leverage-ranked open questions
+  (during-GOAL only)        plan.md, checkpoint.md, tasks/<id>/, gate.md
+.claude/
+  agents/                   planner / worker / critic / integrator
+  commands/                 /hanna-dispatch-next slash command
+.github/workflows/ci.yml    pytest + Rule 1/35/37 compliance greps
+data/                       SQLite + product files (data/hanna.sqlite gitignored)
+web/templates/              Phase-1 design reference (HTML mockups)
 bin/
   hanna-brief.command       morning-brief launcher (Phase-1)
 ```

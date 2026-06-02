@@ -471,6 +471,331 @@ The 33 rules are Review rather than Cut because the *posture* they encode (biolo
 
 ---
 
+### D009 — Adopt the multi-agent orchestrator framework (generalize & reuse)
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim)
+**Scope:** new root [`ORCHESTRATOR.md`](../ORCHESTRATOR.md); `.claude/agents/{planner,worker,critic,integrator}.md`; new `state/` durable layer (`beliefs.md`, `open_questions.md`); [`CLAUDE.md`](../CLAUDE.md) pointer; relationship to [D002](#d002--mixture-of-experts-agent-team-execution-model-for-substrate-level-work) and the `/hanna-dispatch-next` harness.
+
+**Decision.** Adopt a generalized multi-agent orchestrator operating manual (plan → delegate → verify → ship, with planner/worker/critic/integrator roles, a durable `state/` layer including a supersession-tracked belief layer, and formal EXIT/HALT termination) as the umbrella operating mode for multi-agent work in this repo. Two sub-choices:
+
+- **D009.1 — Generalize & reuse (not replace, not coexist).** The orchestrator is the umbrella; D002 is its role taxonomy. The generic state names are aliases for Hanna's existing files (`decisions.md`→`docs/DECISIONS.md`, `plan.md`→`docs/ROADMAP.md` §5 + the `NEXT.md` GOAL block, `checkpoint.md`→`NEXT.md`, `parked.md`→`NEXT.md` + `state/open_questions.md`) — no duplicate standing files. Only the two genuinely-new artifacts (`state/beliefs.md`, `state/open_questions.md`) are created. `/hanna-dispatch-next` becomes one workflow under the orchestrator (ORCHESTRATOR.md §8). No teardown of existing machinery.
+- **D009.2 — Separate `ORCHESTRATOR.md`.** The operating manual lives in its own root file; `CLAUDE.md` gains a pointer. The manual (how an agent behaves) stays separate from the project instructions (what Hanna is).
+
+**Reasoning.** An inventory found Hanna already implements ~70% of the framework in bespoke form — D002 roles map 1:1 to planner/worker/critic/integrator, and DECISIONS/ROADMAP/NEXT map to decisions/plan/checkpoint. The genuinely-missing piece is the belief layer, which would have made the 2026-05-22 session's repeated "done → superseded-by-deeper-review" pattern (CodeRabbit rounds 1→2→3; the frame-coalescing bug) visible instead of silent. Generalize & reuse captures that value with the least churn; the adapter mapping avoids the dual-system tax of "coexist" and the teardown risk of "replace."
+
+**Implications.**
+- 7 files created (ORCHESTRATOR.md, state/beliefs.md, state/open_questions.md, 4 `.claude/agents/*.md`); CLAUDE.md gains an Orchestration pointer block; this D009 entry ratifies it.
+- The belief layer is single-writer (orchestrator only); subagents propose deltas in summaries.
+- `state/beliefs.md` + `state/open_questions.md` are tracked (committed) — the audit trail is the artifact.
+- First live GOAL (L4b) is a follow-up invocation, not part of this setup.
+
+**Rejected alternatives.**
+- **Replace & migrate** — retire `/hanna-dispatch-next`, move ROADMAP/DECISIONS/NEXT into a fresh `state/` layer. Rejected: high churn, risks losing the buildout harness's proven value, and re-litigates D002.
+- **Coexist separately** — orchestrator parallel to the harness for non-lane work. Rejected: two orchestration systems duplicate concepts and invite drift.
+- **Merge the manual into `CLAUDE.md`** — rejected: mixes operating-manual and project-instruction concerns; larger blast radius on the canonical project file.
+- **Global `~/.claude/CLAUDE.md`** — rejected: over-broad; this orchestrator is adopted for Hanna, not all projects.
+
+**Related.**
+- [D002](#d002--mixture-of-experts-agent-team-execution-model-for-substrate-level-work) — the role taxonomy this orchestrator formalizes as Claude Code primitives.
+- [D003](#d003--apache-header-convention-clones-inherit-absence) / [D004](#d004--attribution-trailer-hygiene-at-reviewer-and-conventions-layers) — trailer hygiene inherited by every delegation (ORCHESTRATOR.md §9).
+- [`ORCHESTRATOR.md`](../ORCHESTRATOR.md) §7 (Hanna State Adapter), §8 (relationship to the harness), §9 (hard-constraint inheritance).
+
+---
+
+### D010 — L4b rhythm-anchor: events land at 09:00 ET phase-anchor, not compose-moment
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — "go on everything" on PRD Phase 1
+**Scope:** [`src/schemas.py`](../src/schemas.py) `BriefPayload`; [`scripts/first_hanna_brief.py`](../scripts/first_hanna_brief.py) `main()`; [`docs/ROADMAP.md`](ROADMAP.md) §4 L4b spec; future `src/channels/calendar.py` `publish()` event-start argument.
+
+**Decision.** Calendar events authored by L4b's `publish(brief: BriefPayload)` land at the **rhythm-anchor timestamp** for the brief's phase (e.g. MORNING → 09:00 ET on the compose date), NOT at `BriefPayload.composed_at_iso` (the compose moment, which is incidental — could be 07:42, 09:13, etc.). The compose moment is preserved as `composed_at_iso` for audit / dedup but is not the event-start.
+
+Phase → anchor table (per `compute_producer_phase` boundary conventions):
+
+| Phase | Anchor (ET) |
+|---|---|
+| MORNING | 09:00 |
+| MIDDAY | 12:00 |
+| EVENING | 17:00 |
+| WEEKLY_MONDAY | 09:30 |
+| WEEKLY_FRIDAY | 16:00 |
+| MONTHLY | 09:00 (first weekday of month) |
+| FAMILY_LOCKOUT | (no publish — Rule 34 gate at publish site) |
+
+**Reasoning.** D006's posture rationale (DECISIONS.md:319) is *"context the day carries"* — an event sitting in the day-view at the rhythm time, where Joe's eye naturally lands. Compose-moment defeats this: a 07:42 ET morning brief would sit before the workday starts; a 09:13 brief would sit between calendar events. The rhythm-anchor honors the rationale; the implementation cost is a small lookup in `publish()`.
+
+scout-lanes-schemas B2 surfaced this; without D010 the L4b lane spec is incoherent with D006.
+
+**Implications.**
+- `BriefPayload` gains a `phase_anchor_iso: str` field computed at composition (orchestrator computes; composer populates).
+- `publish()` uses `brief.phase_anchor_iso` as event start; uses `brief.composed_at_iso` for audit metadata.
+- `scripts/first_hanna_brief.py` `_compose_brief()` populates `phase_anchor_iso` from the current phase + compose-date.
+- ROADMAP §4 L4b spec updated to reference `phase_anchor_iso` (not `composed_at_iso`) as event-start.
+
+**Rejected alternatives.**
+- **Compose-moment** (original ROADMAP draft): rejected — defeats D006 posture; events scattered across the day.
+- **Rounded-compose-moment** (e.g., round to nearest 15-min): rejected — still phase-incoherent; first morning brief might round to 07:45 or 09:15.
+- **Joe-configured-per-phase** (settings table): rejected — over-engineered for v1; the phase machine already encodes the cadence.
+
+**Related.**
+- [D006](#d006--delivery-channel-dedicated-hanna-icloud-calendar-with-0-minute-anchor-events) — posture rationale this honors.
+- scout-lanes-schemas findings (B2); belief c014.
+- Open question q004 — **closed by this entry.**
+
+---
+
+### D011 — L4b cross-platform stance: macOS-only with explicit `HannaCalendarNotAvailable` on non-Mac
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — "go on everything" on PRD Phase 1
+**Scope:** future `src/channels/calendar.py`; `scripts/first_hanna_brief.py` `main()` exit semantics; `.github/workflows/ci.yml` test matrix; [`docs/ROADMAP.md`](ROADMAP.md) §4 L4b spec.
+
+**Decision.** L4b's Calendar channel is **macOS-only** for v1. On non-macOS platforms (Linux CI, future Windows), `publish()` raises `HannaCalendarNotAvailable("osascript not present — Calendar channel is macOS-only at v1")`. `scripts/first_hanna_brief.py` `main()` catches this exception, logs it at INFO, and exits 0 with the brief still composed and persisted to SQLite — the lockout-style "well-defined no-op" pattern.
+
+CI (ubuntu-latest) exercises only the mocked-subprocess test path (`tests/test_calendar.py` ≥6 mocked cases per ROADMAP §4 L4b); real Calendar.app integration is gated on `HANNA_INTEGRATION_TEST_CALENDAR=1` env var that only Joe sets on his Mac.
+
+CalDAV / EventKit cross-platform paths are catalogued as future work but not committed; if Joe's primary device changes, D011 reverses via a new D-entry.
+
+**Reasoning.** Hanna runs on Joe's Mac. The Linux dev env (this remote container) and CI exist for code authoring + automated checks, not for production behavior. Making `publish()` cross-platform would add `caldav`/`vobject` dependencies for a behavior Joe doesn't use today (he lives in Apple Calendar). The macOS-only stance with explicit `HannaCalendarNotAvailable` keeps the contract honest: the channel exists where Joe is; elsewhere it returns a documented no-op.
+
+scout-lanes-schemas B1 + scout-architecture flagged this as drift between ROADMAP §4 (no platform gate) and NEXT.md (names the exception). D011 reconciles to NEXT.md's framing and writes it into the lane spec.
+
+**Implications.**
+- New exception class `HannaCalendarNotAvailable` in `src/channels/calendar.py` (L4b lane work).
+- `scripts/first_hanna_brief.py` `main()` gains the catch + log-and-skip path now (Phase 1 work, before L4b lands the channel module).
+- ROADMAP §4 L4b spec updated to require the platform gate at the top of `publish()`.
+- CI workflow unchanged (already ubuntu-latest with mocked-subprocess tests); explicit env-var-gated macOS integration noted in the L4b spec.
+
+**Rejected alternatives.**
+- **Cross-platform via CalDAV** (caldav + vobject pip deps): rejected — adds dep surface for a behavior Joe doesn't use; deferred to a future D-entry if Joe migrates off macOS.
+- **Cross-platform via EventKit** (PyObjC bridge): rejected — same dep-surface concern + macOS-only library anyway.
+- **Silent skip on non-macOS** (no exception, no log): rejected — opaque; the lockout-style explicit-no-op is the established Hanna pattern (Rule 34 model).
+
+**Related.**
+- [D006](#d006--delivery-channel-dedicated-hanna-icloud-calendar-with-0-minute-anchor-events) — names the channel; D011 names the platform surface.
+- scout-lanes-schemas findings (B1); belief c010.
+- Open question q005 — **closed by this entry.**
+
+---
+
+### D012 — L4b idempotency contract: brief-id key = SHA256(phase + anchor-date + product-name-set)
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — "go on everything" on PRD Phase 1
+**Scope:** [`src/schemas.py`](../src/schemas.py) `BriefPayload`; [`scripts/first_hanna_brief.py`](../scripts/first_hanna_brief.py) `briefs` SQLite schema + `_persist()`; future `src/channels/calendar.py` `publish()` dedup behavior.
+
+**Decision.** Every brief carries an idempotency key:
+
+```
+brief_id = sha256(phase.name + "|" + anchor_date_iso + "|" + "|".join(sorted(referenced_products))).hexdigest()[:16]
+```
+
+Where `anchor_date_iso` is the date-portion of `BriefPayload.phase_anchor_iso` (per D010). The `briefs` SQLite schema gains a `brief_id TEXT UNIQUE NOT NULL` column. `_persist()` becomes `INSERT OR IGNORE` — re-running the same composition (same phase, same anchor day, same product set) is a no-op on disk. L4b's `publish()` uses `brief_id` to look up a previously-published `CalendarEventId` before creating; on collision it returns the existing event-id.
+
+**Reasoning.** Without an idempotency contract, scout-ops B-OPS-002 surfaced that L4b would create **duplicate Joe-visible calendar events on every retry** (crash recovery, restart, accidental re-invocation). The chosen key shape uses semantically meaningful inputs (phase + anchor day + product set) so two intentional compositions with the same content collide, while a re-compose-with-different-products yields a fresh brief_id. The 16-char prefix of SHA256 gives ~10^19 collision space — sufficient for a single-user multi-decade calendar.
+
+The key is computed deterministically from `BriefPayload` fields; no external state (clock, randomness) is required, so the same brief computed on two different machines produces the same key.
+
+**Implications.**
+- `BriefPayload` gains a `brief_id: str` field; `_compose_brief()` computes it after `phase_anchor_iso` is set.
+- `scripts/first_hanna_brief.py` SCHEMA constant gets the new column + UNIQUE; existing `data/hanna.sqlite` files survive via `ALTER TABLE` migration on `_persist()` (or fresh-schema since data/*.sqlite is gitignored — the recovery path is "delete and recompose").
+- `_persist()` uses `INSERT OR IGNORE`; `tests/test_first_hanna_brief.py` gains a re-invocation dedup test.
+- L4b's `publish()` contract (in ROADMAP §4) gains the lookup-by-brief_id behavior.
+
+**Rejected alternatives.**
+- **UUID4 per brief**: rejected — random; same composition would get distinct UUIDs, defeating dedup.
+- **ULID with anchor-time embedded**: rejected — temporally-ordered keys leak the compose moment; D010 already separated anchor from compose, no need to re-mix.
+- **Content hash over body_markdown**: rejected — sensitive to whitespace/voice changes (e.g. the 0f35f33 voice fix would have invalidated all prior briefs); semantic-key over (phase, day, products) is more robust.
+- **Joe-clears-dedup-manually**: rejected — Rule 36 violation (forces a decision on Joe).
+
+**Related.**
+- [D006](#d006--delivery-channel-dedicated-hanna-icloud-calendar-with-0-minute-anchor-events) + [D010](#d010--l4b-rhythm-anchor-events-land-at-0900-et-phase-anchor-not-compose-moment).
+- scout-ops findings (B-OPS-002); scout-lanes-schemas; belief c012.
+- Open question q006 — **closed by this entry.**
+
+---
+
+### D013 — `compute_producer_phase` branch precedence: MONTHLY > WEEKLY_MONDAY/FRIDAY > daily phases
+
+**Status:** resolved
+**Date:** 2026-05-25 (ratified as Phase 2 of "go on everything")
+**Ratified by:** Joe (Joseph Ibrahim)
+**Scope:** [`src/computations/compute_producer_phase.py`](../src/computations/compute_producer_phase.py); [`tests/computations/test_compute_producer_phase.py`](../tests/computations/test_compute_producer_phase.py); [`docs/REVIEW_2026-05-22.md`](REVIEW_2026-05-22.md) heuristic spec.
+
+**Decision.** The branch order encoded in `compute_producer_phase` — `MONTHLY → WEEKLY_MONDAY → WEEKLY_FRIDAY → MORNING → MIDDAY → EVENING` (after the FAMILY_LOCKOUT gate) — is **intentional precedence**, not incidental line ordering. Concretely:
+
+- When `now.day == monthly_day` AND `now.weekday() == 0 (Mon)` at `weekly_monday_hour`, the **MONTHLY** branch fires first and wins. The WEEKLY_MONDAY branch never runs for that timestamp.
+- Symmetric for the first-Friday-of-month at `weekly_friday_hour`: MONTHLY beats WEEKLY_FRIDAY.
+- The daily-phase branches (MORNING / MIDDAY / EVENING) fire only when none of the rarer-cadence branches matched.
+
+The conditional ordering in [`src/computations/compute_producer_phase.py`](../src/computations/compute_producer_phase.py) (lines 32, 34, 36, 38, 40, 42) is the canonical encoding of this precedence. This D-entry ratifies the existing behavior as the intended contract and the regression tests in `TestPhasePrecedence` document it.
+
+**Reasoning.** MONTHLY is rarer and more architectural than WEEKLY_MONDAY/FRIDAY — it sets a once-per-month rhythm against an otherwise weekly cadence. Collapsing MONTHLY into the weekly slot would mute the monthly cadence to **once a year** in the worst case (when day-of-month 1 happens never to land on a workday — which never actually happens at default monthly_day=1, but the principle generalizes if `monthly_day` is reconfigured). The chosen precedence preserves the monthly rhythm at the cost of one weekly slot per month getting "promoted" to a MONTHLY brief — Joe receives a MONTHLY brief on those days, not a WEEKLY one. Acceptable per the producer-rhythm priority: rarer-cadence beats more-frequent.
+
+**Implications.**
+
+- Code already encodes this precedence at [`src/computations/compute_producer_phase.py:32–42`](../src/computations/compute_producer_phase.py) — no production code change needed.
+- [`tests/computations/test_compute_producer_phase.py`](../tests/computations/test_compute_producer_phase.py) gains `TestPhasePrecedence` with 3 regression tests (first-Monday + first-Friday collision cases plus a non-collision Monday control); these are the standing audit trail for the contract.
+- The phase-machine description in [`README.md`](../README.md) and [`HANNA_BLUEPRINT.md`](../HANNA_BLUEPRINT.md) should add the precedence note in the Phase 4 documentation sweep — deferred, not blocking.
+- L4b `publish()` callers can rely on the precedence: if the dispatcher hands them a `MONTHLY` brief, they don't also need to publish a WEEKLY one for the same day.
+
+**Rejected alternatives.**
+
+- **Explicit precedence tracking via `prev_phase`.** Rejected — `prev_phase` is annotated as unused at v1 per L3a (`src/computations/compute_producer_phase.py:26`) and ROADMAP §4 L3a "no hysteresis." Adding it back as a precedence mechanism reverses an explicit Cut.
+- **Merge MONTHLY into the WEEKLY_MONDAY slot on collision** (e.g., a "monthly_in_weekly" sentinel). Rejected — silences the monthly cadence behind a weekly framing; Joe loses the monthly-tempo signal.
+- **Raise on collision** (force a `PhaseCollision` exception so a caller decides). Rejected — Rule 36 violation. The producer's job is to surface, not to force a decision on Joe. The deterministic precedence is the surfacing.
+
+**Related.**
+
+- L3a commit `04af5da` — original `compute_producer_phase` landing; encodes the precedence by line order.
+- scout-tests finding B3 (Phase 2 reconnaissance) — surfaced the absent regression coverage.
+- Belief `c008` — superseded by this entry; precedence is now documented + tested.
+- [D008.7](#d008--4-inheritance-ratification-cut-six-pending-items-review-the-33-rules) — selective re-adoption of inherited rules; the prev_phase-unused stance here is a parallel "no hysteresis at v1" call.
+
+---
+
+### D014 — `LockoutResponse` shape: structured no-op JSON returned (not raised) from MCP tools during FAMILY_LOCKOUT
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — "ratified" SPEC of the hanna-real-arc; D014 surfaces as Line B's top proposal at DELIBERATE cycle 1; main-thread per D002 (decisions author-by-main-thread).
+**Scope:** future `python/hanna/mcp_server.py` Rule-34-layer-3 gate at every `hanna_*` MCP tool; closes [q002](../state/open_questions.md); referenced by future L6 dispatch.
+
+**Decision.** When any `hanna_*` MCP tool is invoked during `FAMILY_LOCKOUT`, the tool body **returns** a structured JSON object — it does not raise. The JSON shape:
+
+```json
+{
+  "paused": true,
+  "reason": "FAMILY_LOCKOUT",
+  "phase": "FAMILY_LOCKOUT",
+  "next_anchor_iso": "2026-05-26T09:00:00-04:00",
+  "message": "Hanna is paused outside Mon–Fri 09:00–17:00 ET.",
+  "override_path_hint": "RULES.md Rule 34 documents the override mechanism."
+}
+```
+
+Field semantics:
+- `paused: bool` — top-level boolean for renderers that surface top-level keys. Always `true` in this shape.
+- `reason: str` — `"FAMILY_LOCKOUT"` for now; future `LockoutResponse` variants may carry other reasons (e.g., `"RED_OVERRIDE"` per Rule 18 if Hanna ever exposes that).
+- `phase: str` — current `ProducerPhase` name. Lets the caller distinguish "actually lockout" from "between phases."
+- `next_anchor_iso: str` — when Hanna will be active again (per D010 phase-anchor math on the next weekday).
+- `message: str` — human-readable, Rule-36-clean, descriptive (no directives).
+- `override_path_hint: str | null` — **informational only**. Does NOT decide the `override_token` mechanism (that's q014). Just points at where to read more.
+
+The tool's MCP-side return is `success` — the tool *completed*. The JSON indicates pause; the caller decides what to render.
+
+**Reasoning.** Three rejected alternatives:
+- **Exception-with-rich-message** — raising forces the MCP client to treat the call as failure. Even with a structured exception payload, Claude Code's renderer shows a red error banner; defeats the "well-defined no-op" posture D006 promised. *Also Rule 36 risk* if the message reads directive.
+- **Decorator-injected-skip** (tool body never runs; decorator returns a sentinel) — opaque; debugging "why didn't my hanna_log work?" is hard.
+- **Exception-with-structured-payload (raise with recoverable JSON)** — conflates success path with failure path; MCP clients vary in how they surface raised exception data.
+
+Chosen: structured no-op JSON returned. The success/failure axis stays clean (`success`); the paused/active axis lives in the payload (`paused: true`). Rule 36 voice in `message`. The `paused` boolean at JSON top means *every* MCP renderer that handles top-level keys can short-circuit cleanly.
+
+scout-security-rules B-1 named "override_token openly spec-only" as a gap; D014 takes the first step toward an MCP-layer lockout that DOES respect the override path conceptually, without yet committing to the secret-storage substrate (q014).
+
+**Implications.**
+- L6's `mcp_tools` lane will land a `_lockout_response(phase, now)` helper in `python/hanna/mcp_server.py` that builds this JSON; every `hanna_*` tool wraps its body with the layer-3 gate.
+- L4b's `publish()` already returns `None` on FAMILY_LOCKOUT per D011 — `publish()` is not an MCP tool, so it returns `None` rather than this JSON. The two surfaces are different.
+- F6 (LockoutResponse rendered as an error in Claude Code) is now testable: hand a static `LockoutResponse` JSON to Claude Code via a one-line MCP test tool and observe rendering. If the renderer mishandles it, D014 reverses via a new D-entry.
+- q002 — **closed by this entry.**
+
+**Rejected alternatives** (canonical block; harness-style + Hanna-style).
+- Exception with rich message — Rule 36 risk + Claude Code renders as error.
+- Decorator-injected-skip — opaque to Joe; debuggability suffers.
+- Exception with structured payload — conflates success/failure path; renderer-dependent.
+
+**Related.**
+- [D006](#d006--delivery-channel-dedicated-hanna-icloud-calendar-with-0-minute-anchor-events) — the "well-defined no-op" posture this honors.
+- [`RULES.md`](../RULES.md) Rule 34 — the lockout rule whose Layer 3 this surface implements.
+- scout-security-rules B-1 (state/tasks/scout-security-rules/findings.md).
+- q002 — closed.
+
+---
+
+### D015 — Brief composition boundary: one composition = one MCP-tool body invocation
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — "ratified" SPEC of the hanna-real-arc; D015 surfaces as Line B's 2nd proposal at DELIBERATE cycle 1; main-thread per D002.
+**Scope:** [D001](#d001--rule-35-permissive-reading-exchange_index-advance-is-not-a-write) "≤1 coach call per brief composition" semantic; [D005.1](#d005--harlo-bridge-hardening-rate-limit--read-timeout--stderr-drain) `begin_composition()` / `end_composition()` boundary; future `python/hanna/mcp_server.py` per-tool composition wrapper; closes [q007](../state/open_questions.md).
+
+**Decision.** A **brief composition** is one invocation of one MCP tool body (or one invocation of `scripts/first_hanna_brief.py` as the day-zero PoC entry). All Harlo `coach` calls made transitively from within that body share the same composition. `begin_composition()` is called at the top of the tool body (or by `drive_coaching_exchange()` implicitly); `end_composition()` is called at the bottom in a `try` / `finally`.
+
+Nested compositions (tool A's body invokes tool B as a function call) are **errors** — `begin_composition` raises `HarloCompositionAlreadyActive` per L3b's existing semantic. Tools that need to call each other do so by *requesting* (return the request, let the orchestrator dispatch) rather than by direct invocation.
+
+**Reasoning.** D001 named the rate-limit semantic ("≤1 coach call per brief composition") but the term "composition" was operationally undefined. The L3b bridge hardening added `begin_composition()` / `end_composition()` machinery without specifying what counts as one composition. Today's PoC at `scripts/first_hanna_brief.py` happens to satisfy the rule "accidentally" — `drive_coaching_exchange()` wraps `begin/_coach/end` per invocation, and the PoC only invokes the bridge once per run.
+
+For L6's MCP tools, the natural boundary is the tool body: each MCP-tool invocation is one composition. This isolates the coach rate-limit to per-tool-call; matches D001's intent; keeps Rule 35 surface visible at the tool-body diff level (per D001 Implications bullet 4).
+
+scout-architecture flagged q007 as gating L6 dispatch. D015 closes it cleanly.
+
+**Implications.**
+- L6 `mcp_tools` will wrap every `hanna_*` tool body with `with bridge.composition():` (a new context manager on `HarloBridge` that calls `begin_composition` / `end_composition`). Nested calls raise.
+- The PoC at `scripts/first_hanna_brief.py` continues to satisfy D015 because `drive_coaching_exchange()` is one composition.
+- A future "Hanna calls Hanna" pattern (one tool's body invokes another's logic) requires factoring the shared logic into composition-agnostic helpers — NOT calling the inner tool's MCP surface directly.
+- q007 — **closed by this entry.**
+
+**Rejected alternatives.**
+- **Composition = one brief artifact** (one calendar event = one composition). Rejected — tool bodies that don't ship a brief (e.g., `hanna_log`) would have no composition scope at all.
+- **Composition = one MCP session** (start at session start, end at session end). Rejected — too coarse; sessions are long-lived and would defeat D001's per-brief rate-limit.
+- **Composition = one Harlo subprocess lifetime**. Rejected — bridge can outlive many compositions per L3b's design.
+
+**Related.**
+- [D001](#d001--rule-35-permissive-reading-exchange_index-advance-is-not-a-write) — semantic this operationalizes.
+- [D005.1](#d005--harlo-bridge-hardening-rate-limit--read-timeout--stderr-drain) — bridge machinery this fits to.
+- scout-architecture (state/tasks/scout-architecture/findings.md).
+- q007 — closed.
+
+---
+
+---
+
+### D016 — Octavius reachability finding: exists on GitHub, not yet installed locally; L7 gates on contract surfacing + local install
+
+**Status:** resolved
+**Date:** 2026-05-25
+**Ratified by:** Joe (Joseph Ibrahim) — direct reply to q016 at DELIBERATE cycle 1: "It exists on GitHub not locally yet."
+**Scope:** [F3](../state/tasks/hanna-real-arc/SPEC.md) (falsification condition); L7 `octavius_bridge.py` design + dispatch ordering; `FormationRequest`/`FormationOutput` schemas (deferred from Line B); closes [q016](../state/open_questions.md); raises [q017](../state/open_questions.md) (contract surfacing path).
+
+**Decision.** Octavius is a real GitHub repo but is **not installed locally on Joe's Mac** as of 2026-05-25. F3 (Octavius doesn't exist) is FALSE — falsification condition is not triggered, and L7 IS buildable in principle. However, L7's runtime verifier (P4 — spawn/poll/harvest end-to-end) cannot fire until two preconditions hold:
+
+1. **Joe installs Octavius locally.** The L7 binary must be on Joe's `PATH` (or at a known absolute path) for `subprocess.Popen(["octavius", "mcp"])` to succeed.
+2. **Hanna learns Octavius's IPC contract.** The MCP-stdio request/response envelope shape (spawn-formation / poll / harvest) must be specified before `FormationRequest` and `FormationOutput` schemas can be authored. Three candidate paths surface as **q017**: (a) Joe pastes the contract verbatim; (b) widen `mcp__github__*` scope to include the Octavius repo so an agent reads it; (c) Joe installs locally + runs it once + shares the API shape from real traffic.
+
+L7's `src/octavius_bridge.py` lands as a **stub with `NotImplementedError`** until both preconditions are met. `FormationRequest`/`FormationOutput` schemas stay deferred. L7's runtime verifier is gated; mocked tests can still build against the stub.
+
+The Hanna arc CAN proceed: L4b (this cycle), L5 partial (JoeStateSnapshot now; Override + Formation later), L6 (mcp_server.py with `hanna_formation_request` returning a `LockoutResponse`-equivalent "OCTAVIUS_NOT_INSTALLED" until L7 ratifies). The arc terminates at "Hanna is real with Octavius stubbed" if q017 stays open at SHIP; that's a documented bounded weakness, not a showstopper.
+
+**Reasoning.** Joe's direct answer to q016 is the verifier the dead Line C spike couldn't be. The DEADENDS-c033 class extends (c035): this Linux sandbox + restricted GitHub MCP scope can't reach Octavius's contract either, so the question recurses to Joe.
+
+The L7 stub-first posture is the harness's "MISSING VERIFIER → build it before proceeding. It may be the deliverable" rule applied: until the runtime verifier exists (Joe installs Octavius), we ship the SHAPE that the verifier will gate, and we DO ship it — just behind a documented NotImplementedError.
+
+**Implications.**
+- `FormationRequest` and `FormationOutput` schemas remain deferred at Line B / cycle 2; they author after q017 closes.
+- L7 lands `src/octavius_bridge.py` with classes + method signatures + docstrings + `NotImplementedError`-bodies + mocked-subprocess tests. The real implementation lands when q017 resolves.
+- The L6 `hanna_formation_request` MCP tool returns a `LockoutResponse`-equivalent JSON `{ "octavius_installed": false, "install_path_hint": "<TBD>" }` on Joe's Mac until the local install completes.
+- Arc CHAMPION's P4 confidence stays at 0.40 until q017 closes; on close + local install, P4 jumps to ~0.75.
+- DEADENDS-c033 class is generalized to c035: "Linux-sandbox + restricted GitHub MCP scope cannot reach external resources outside that scope."
+
+**Rejected alternatives.**
+- **Author `FormationRequest`/`FormationOutput` speculatively now from BLUEPRINT §9 prose**. Rejected — guessing wrong forces schema redo + Rule 36 violation (committing fields not grounded in evidence).
+- **Block the entire arc on q017**. Rejected — Lines A and B can run usefully without Octavius's contract; only L7 + half of L5 + one MCP tool gate on it.
+- **Skip L7 entirely; remove P4 from SPEC**. Rejected — P4 is part of "Hanna is real" per the ratified SPEC; the arc reverses cleanly via SHIP report bounded-weakness if needed, but the runway exists.
+
+**Related.**
+- F3 (state/tasks/hanna-real-arc/SPEC.md) — falsification condition NOT triggered.
+- c034 (state/beliefs.md) — records the finding.
+- c035 — DEADENDS class generalization.
+- q016 — closed by this entry.
+- q017 — raised by this entry (high-leverage; gates L7 runtime + 2 of 4 L5 schemas).
+
+---
+
 ## End of decisions log
 
-Next decision number: **D009**.
+Next decision number: **D017**.

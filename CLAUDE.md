@@ -21,6 +21,12 @@ Hanna conventions accrete as sessions resolve open questions. See [`docs/CONVENT
 
 ---
 
+## Orchestration
+
+Multi-agent work in this repo runs under the orchestrator operating manual in [`ORCHESTRATOR.md`](ORCHESTRATOR.md). Subagent roles live in `.claude/agents/` (planner / worker / critic / integrator); durable belief and open-question state lives in `state/`. `/hanna-dispatch-next` is one workflow under that orchestrator (see ORCHESTRATOR.md §8). This file does not duplicate the manual; it points at it.
+
+---
+
 ## Commit trailer (canonical)
 
 Every commit in this repo ends with the canonical Claude Code format:
@@ -73,5 +79,6 @@ Session docs live under `docs/SESSION_NN_*.md`.
 - Not a duplicate of the global `~/.claude/CLAUDE.md`. Behaviors, body-first protocols, coworker blend, RSD guidance — those live globally. This file is project scope only.
 - Not a duplicate of `RULES.md`. Rules live there; this file points at them.
 - Not a duplicate of `HANNA_BLUEPRINT.md`. Architecture lives there.
+- Not a duplicate of `ORCHESTRATOR.md`. The orchestration manual lives there; this file points at it.
 
 Each file has one job.
