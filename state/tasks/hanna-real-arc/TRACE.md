@@ -23,3 +23,9 @@
 | 2026-05-25T(EXECUTE-1) | verifier-result | Line A worker returned → pytest 139/139; PoC end-to-end exit 0; L0+L1+L2 PASS |
 | 2026-05-25T(EXECUTE-1) | verifier-result | Line A critic[verify] PASS 36/36 → CHAMPION promoted seed-2118024 → arc-cycle1-line-A-a2d64cd (score 0.27 → 0.435) |
 | 2026-05-25T(EXECUTE-1) | branch-decision | 3 RECOMMENDED-CHANGES from critic[verify] parked (cosmetic; non-blocking) |
+| 2026-05-25T(cycle-1-close) | external-call | Joe q017 reply: (c) install + share traffic — closes q017 with closed-pending-action state |
+| 2026-05-25T(cycle-1-close) | reorganize | cycle 1 → cycle 2 REORGANIZE: retire A (delivered+promoted), retire C (closed by D016), continue B as B-cont (JoeStateSnapshot), open D (L6 mcp_tools partial), open F (L7 octavius_bridge.py stub); G considered+deferred |
+| 2026-05-25T(cycle-2-open) | mode-change | re-derive: ORCHESTRATED TEAM preserved (BREADTH=3 lines, INDEPENDENCE=medium, HORIZON=long unchanged) |
+| 2026-05-25T(cycle-2-open) | critique-result | Line D survives critique 5/5 (R1-R4 mitigations baked) |
+| 2026-05-25T(cycle-2-open) | critique-result | Line B-cont survives critique 3/5 (R1/R2 carried from cycle 1) |
+| 2026-05-25T(cycle-2-open) | critique-result | Line F survives critique 2/5 (R1: OctaviusNotInstalled not bare NotImplementedError) |
